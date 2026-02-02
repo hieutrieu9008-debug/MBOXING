@@ -21,8 +21,8 @@
 - [x] Create `/design/` structure and Figma tracking <!-- id: 12 -->
 - [x] Document quality standards (Polished & Professional) <!-- id: 13 -->
 - [x] DECISION: React Native (with native module option for Slice 05) <!-- id: 14 -->
-- [ ] Set up GitHub repository <!-- id: 15 -->
-- [ ] Initialize version control and commit Phase 1 PRD <!-- id: 16 -->
+- [x] Set up GitHub repository <!-- id: 15 -->
+- [x] Initialize version control and commit Phase 1 PRD <!-- id: 16 -->
 
 ## Current Phase
 **Phase 1: Thinking/Brainstorming** ✅ COMPLETE
