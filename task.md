@@ -29,6 +29,22 @@
 
 All slices are in placeholder state. Ready to move to Phase 2 (Design) when you're ready.
 
+---
+
+## Environment Setup (In Progress)
+- [x] Install Node.js (v18+)
+- [x] Install Expo CLI (`npm install -g expo-cli`)
+- [x] Install EAS CLI (`npm install -g eas-cli`)
+- [x] Create Expo account and login
+- [x] Create "Hello World" app (`npx create-expo-app mobile`)
+- [x] Test on phone with Expo Go
+- [x] Create Supabase account and project
+- [x] Connect Supabase to app
+- [x] Verify Supabase connection works
+- [x] Commit environment setup to GitHub
+
+✅ **Environment Setup Complete!**
+
 ## Next Session Startup Command
 ```
 Read task.md, vision.md, and agent-system.md to restore context
