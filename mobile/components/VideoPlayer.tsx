@@ -31,7 +31,7 @@ const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoPlayerProps) {
     const videoRef = useRef<Video>(null);
-    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastTapRef = useRef<{ time: number; side: 'left' | 'right' | null }>({ time: 0, side: null });
 
     const [isPlaying, setIsPlaying] = useState(false);
@@ -81,7 +81,7 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                 clearTimeout(controlsTimeoutRef.current);
             }
         };
-    }, [isPlaying, showControls, isSeeking, showSpeedMenu]);
+    }, [isPlaying, showControls, isSeeking, showSpeedMenu, isFullscreen]);
 
     // Show controls when paused
     useEffect(() => {
@@ -279,7 +279,7 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                 {showControls && !isLoading && (
                     <View style={styles.controlsOverlay} pointerEvents="box-none">
                         {/* Top bar */}
-                        <View style={styles.topBar}>
+                        <View style={styles.topBar} pointerEvents="auto">
                             {isFullscreen && (
                                 <TouchableOpacity onPress={toggleFullscreen} style={styles.backButton}>
                                     <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -307,7 +307,7 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                         </View>
 
                         {/* Bottom bar */}
-                        <View style={styles.bottomBar}>
+                        <View style={styles.bottomBar} pointerEvents="auto">
                             <Text style={styles.timeText}>{formatTime(isSeeking ? seekValue : position)}</Text>
 
                             <View style={styles.sliderContainer}>
