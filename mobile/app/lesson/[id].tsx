@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text, ActivityIndicator, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
@@ -15,13 +15,15 @@ import VideoPlayer from '../../components/VideoPlayer';
 import LessonHeader from '../../components/LessonHeader';
 import RelatedLessons from '../../components/RelatedLessons';
 
-// Sample video URLs for demo (boxing-related content)
+// Sample video URLs for demo
 const SAMPLE_VIDEOS = [
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
 ];
+
+const AUTOPLAY_COUNTDOWN = 5; // seconds
 
 export default function LessonScreen() {
     const { id, courseId } = useLocalSearchParams<{ id: string; courseId: string }>();
@@ -35,31 +37,75 @@ export default function LessonScreen() {
     const [watchedSeconds, setWatchedSeconds] = useState(0);
     const [isCompleted, setIsCompleted] = useState(false);
 
+    // Autoplay state
+    const [showAutoplay, setShowAutoplay] = useState(false);
+    const [autoplayCountdown, setAutoplayCountdown] = useState(AUTOPLAY_COUNTDOWN);
+    const countdownRef = useRef<NodeJS.Timeout | null>(null);
+    const progressAnim = useRef(new Animated.Value(1)).current;
+
     useEffect(() => {
         loadLesson();
+        // Reset autoplay when lesson changes
+        setShowAutoplay(false);
+        setAutoplayCountdown(AUTOPLAY_COUNTDOWN);
+        progressAnim.setValue(1);
     }, [id, courseId]);
+
+    // Cleanup countdown on unmount
+    useEffect(() => {
+        return () => {
+            if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+            }
+        };
+    }, []);
+
+    // Autoplay countdown logic
+    useEffect(() => {
+        if (showAutoplay && autoplayCountdown > 0) {
+            countdownRef.current = setInterval(() => {
+                setAutoplayCountdown((prev) => {
+                    if (prev <= 1) {
+                        // Navigate to next lesson
+                        handleNextLesson();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
+            // Animate progress bar
+            Animated.timing(progressAnim, {
+                toValue: 0,
+                duration: AUTOPLAY_COUNTDOWN * 1000,
+                useNativeDriver: false,
+            }).start();
+        }
+
+        return () => {
+            if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+            }
+        };
+    }, [showAutoplay]);
 
     const loadLesson = async () => {
         if (!id) return;
 
         setIsLoading(true);
 
-        // Load the lesson
         const lessonData = await getLessonById(id);
         setLesson(lessonData);
 
         if (lessonData && (courseId || lessonData.course_id)) {
             const actualCourseId = courseId || lessonData.course_id;
 
-            // Load course info
             const courseData = await getCourseById(actualCourseId);
             setCourse(courseData);
 
-            // Load all lessons for related section
             const lessons = await getLessonsByCourseId(actualCourseId);
             setAllLessons(lessons);
 
-            // Get next lesson
             const next = await getNextLesson(actualCourseId, lessonData.order_index);
             setNextLesson(next);
         }
@@ -72,9 +118,12 @@ export default function LessonScreen() {
     }, []);
 
     const handleVideoComplete = useCallback(() => {
-        // Auto-mark as ready for completion
         console.log('Video finished playing');
-    }, []);
+        // Show autoplay countdown if there's a next lesson
+        if (nextLesson) {
+            setShowAutoplay(true);
+        }
+    }, [nextLesson]);
 
     const handleToggleComplete = () => {
         setIsCompleted(!isCompleted);
@@ -83,16 +132,28 @@ export default function LessonScreen() {
 
     const handleNextLesson = () => {
         if (nextLesson && courseId) {
+            // Cancel any running countdown
+            if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+            }
+            setShowAutoplay(false);
             router.replace(`/lesson/${nextLesson.id}?courseId=${courseId}` as any);
         }
     };
 
-    // Get a sample video URL based on lesson order
+    const cancelAutoplay = () => {
+        if (countdownRef.current) {
+            clearInterval(countdownRef.current);
+        }
+        setShowAutoplay(false);
+        setAutoplayCountdown(AUTOPLAY_COUNTDOWN);
+        progressAnim.setValue(1);
+    };
+
     const getVideoUrl = (lessonData: Lesson): string => {
         if (lessonData.video_url) {
             return lessonData.video_url;
         }
-        // Use a sample video based on order index
         const index = (lessonData.order_index - 1) % SAMPLE_VIDEOS.length;
         return SAMPLE_VIDEOS[index];
     };
@@ -181,12 +242,50 @@ export default function LessonScreen() {
             </ScrollView>
 
             {/* Next Lesson Button */}
-            {nextLesson && (
+            {nextLesson && !showAutoplay && (
                 <View style={styles.nextLessonContainer}>
                     <TouchableOpacity style={styles.nextLessonButton} onPress={handleNextLesson}>
                         <Text style={styles.nextLessonText}>NEXT LESSON</Text>
                         <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                     </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Autoplay Countdown Overlay */}
+            {showAutoplay && nextLesson && (
+                <View style={styles.autoplayContainer}>
+                    <View style={styles.autoplayCard}>
+                        <Text style={styles.autoplayTitle}>Up Next</Text>
+                        <Text style={styles.autoplayLessonTitle}>{nextLesson.title}</Text>
+
+                        <View style={styles.countdownContainer}>
+                            <Text style={styles.countdownText}>{autoplayCountdown}</Text>
+                        </View>
+
+                        {/* Animated progress bar */}
+                        <View style={styles.progressBarContainer}>
+                            <Animated.View
+                                style={[
+                                    styles.progressBar,
+                                    {
+                                        width: progressAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ['0%', '100%'],
+                                        }),
+                                    },
+                                ]}
+                            />
+                        </View>
+
+                        <View style={styles.autoplayButtons}>
+                            <TouchableOpacity style={styles.cancelButton} onPress={cancelAutoplay}>
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.playNowButton} onPress={handleNextLesson}>
+                                <Text style={styles.playNowButtonText}>Play Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
             )}
         </View>
@@ -274,5 +373,92 @@ const styles = StyleSheet.create({
         color: COLORS.background,
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    // Autoplay styles
+    autoplayContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 16,
+        paddingBottom: 32,
+        backgroundColor: COLORS.background,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    autoplayCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: 16,
+        padding: 20,
+        alignItems: 'center',
+    },
+    autoplayTitle: {
+        color: COLORS.textMuted,
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 1,
+        marginBottom: 8,
+    },
+    autoplayLessonTitle: {
+        color: COLORS.text,
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    countdownContainer: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    countdownText: {
+        color: COLORS.background,
+        fontSize: 28,
+        fontWeight: 'bold',
+    },
+    progressBarContainer: {
+        width: '100%',
+        height: 4,
+        backgroundColor: COLORS.border,
+        borderRadius: 2,
+        marginBottom: 20,
+        overflow: 'hidden',
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary,
+    },
+    autoplayButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    cancelButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: COLORS.surface,
+        alignItems: 'center',
+    },
+    cancelButtonText: {
+        color: COLORS.text,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    playNowButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+    },
+    playNowButtonText: {
+        color: COLORS.background,
+        fontSize: 15,
+        fontWeight: '600',
     },
 });
