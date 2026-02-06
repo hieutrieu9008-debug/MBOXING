@@ -338,54 +338,64 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                     </View>
                 )}
             </View>
-
-            {/* Speed menu modal */}
-            <Modal visible={showSpeedMenu} transparent animationType="fade">
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setShowSpeedMenu(false)}
-                >
-                    <View style={styles.speedMenu}>
-                        <Text style={styles.speedMenuTitle}>Playback Speed</Text>
-                        {PLAYBACK_SPEEDS.map((speed) => (
-                            <TouchableOpacity
-                                key={speed}
-                                style={[
-                                    styles.speedOption,
-                                    playbackSpeed === speed && styles.speedOptionActive,
-                                ]}
-                                onPress={() => changePlaybackSpeed(speed)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.speedOptionText,
-                                        playbackSpeed === speed && styles.speedOptionTextActive,
-                                    ]}
-                                >
-                                    {speed}x {speed === 1 && '(Normal)'}
-                                </Text>
-                                {playbackSpeed === speed && (
-                                    <Ionicons name="checkmark" size={20} color={COLORS.primary} />
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </TouchableOpacity>
-            </Modal>
         </View>
+    );
+
+    // Speed menu - rendered separately to avoid nesting inside fullscreen modal
+    const SpeedMenu = (
+        <Modal visible={showSpeedMenu} transparent animationType="fade">
+            <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setShowSpeedMenu(false)}
+            >
+                <View style={styles.speedMenu}>
+                    <Text style={styles.speedMenuTitle}>Playback Speed</Text>
+                    {PLAYBACK_SPEEDS.map((speed) => (
+                        <TouchableOpacity
+                            key={speed}
+                            style={[
+                                styles.speedOption,
+                                playbackSpeed === speed && styles.speedOptionActive,
+                            ]}
+                            onPress={() => changePlaybackSpeed(speed)}
+                        >
+                            <Text
+                                style={[
+                                    styles.speedOptionText,
+                                    playbackSpeed === speed && styles.speedOptionTextActive,
+                                ]}
+                            >
+                                {speed}x {speed === 1 && '(Normal)'}
+                            </Text>
+                            {playbackSpeed === speed && (
+                                <Ionicons name="checkmark" size={20} color={COLORS.primary} />
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </TouchableOpacity>
+        </Modal>
     );
 
     // Wrap in modal for fullscreen
     if (isFullscreen) {
         return (
-            <Modal visible={isFullscreen} animationType="fade" supportedOrientations={['landscape']}>
-                {VideoContent}
-            </Modal>
+            <>
+                <Modal visible={isFullscreen} animationType="fade" supportedOrientations={['landscape']}>
+                    {VideoContent}
+                </Modal>
+                {SpeedMenu}
+            </>
         );
     }
 
-    return VideoContent;
+    return (
+        <>
+            {VideoContent}
+            {SpeedMenu}
+        </>
+    );
 }
 
 const styles = StyleSheet.create({
