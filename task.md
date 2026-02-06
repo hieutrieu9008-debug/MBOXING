@@ -45,6 +45,20 @@ All slices are in placeholder state. Ready to move to Phase 2 (Design) when you'
 
 ✅ **Environment Setup Complete!**
 
+---
+
+## Phase 2: Design (Started)
+- [ ] Create Figma account
+- [ ] Create "Mustafa's Boxing - Wireframes" file
+- [ ] Wireframe: Login/Onboarding screen
+- [ ] Wireframe: Course Browse screen
+- [ ] Wireframe: Video Player screen
+- [ ] Wireframe: Drill Tracker + Heatmap screen
+- [ ] Wireframe: Combo Builder screen
+- [ ] Export wireframes to `/design/exports/`
+- [ ] Update `/design/figma_links.md` with Figma file link
+- [ ] Commit wireframes to GitHub
+
 ## Next Session Startup Command
 ```
 Read task.md, vision.md, and agent-system.md to restore context
