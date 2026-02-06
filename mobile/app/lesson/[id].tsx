@@ -76,14 +76,14 @@ export default function LessonScreen() {
         console.log('Video finished playing');
     }, []);
 
-    const handleMarkComplete = () => {
-        setIsCompleted(true);
+    const handleToggleComplete = () => {
+        setIsCompleted(!isCompleted);
         // TODO: Save completion status to database
     };
 
     const handleNextLesson = () => {
         if (nextLesson && courseId) {
-            router.replace(`/lesson/${nextLesson.id}?courseId=${courseId}`);
+            router.replace(`/lesson/${nextLesson.id}?courseId=${courseId}` as any);
         }
     };
 
@@ -132,8 +132,7 @@ export default function LessonScreen() {
                                 styles.markCompleteButton,
                                 isCompleted && styles.markCompleteButtonDone,
                             ]}
-                            onPress={handleMarkComplete}
-                            disabled={isCompleted}
+                            onPress={handleToggleComplete}
                         >
                             <Ionicons
                                 name={isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'}

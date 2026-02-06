@@ -8,25 +8,27 @@ export const COLORS = {
   background: '#000000',
   primary: '#D4AF37',      // Championship Gold
   accent: '#DC143C',       // Crimson Red
-  
+
   // Text colors
   text: '#FFFFFF',
   textMuted: '#888888',
   textSecondary: '#AAAAAA',
-  
+
   // UI colors
   card: '#1A1A1A',
   cardHover: '#222222',
+  surface: '#1A1A1A',       // Same as card, for surface elements
   border: '#333333',
-  
+  primaryLight: '#FFD700',  // Lighter gold for active states
+
   // Status colors
   success: '#22C55E',
   warning: '#F59E0B',
   error: '#EF4444',
-  
+
   // Difficulty colors
   beginner: '#22C55E',
-  intermediate: '#F59E0B', 
+  intermediate: '#F59E0B',
   advanced: '#EF4444',
 };
 
@@ -45,13 +47,13 @@ export const SIZES = {
   lg: 24,
   xl: 32,
   xxl: 48,
-  
+
   // Border radius
   radiusSm: 8,
   radiusMd: 12,
   radiusLg: 16,
   radiusXl: 24,
-  
+
   // Font sizes
   fontXs: 12,
   fontSm: 14,
