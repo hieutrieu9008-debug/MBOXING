@@ -13,6 +13,8 @@ import {
 } from '../../lib/database';
 import VideoPlayer from '../../components/VideoPlayer';
 import LessonHeader from '../../components/LessonHeader';
+import NextUpCourse from '../../components/NextUpCourse';
+import RelatedDrills from '../../components/RelatedDrills';
 import RelatedLessons from '../../components/RelatedLessons';
 
 // Sample video URLs for demo
@@ -22,6 +24,15 @@ const SAMPLE_VIDEOS = [
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
     'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
 ];
+
+// Demo descriptions for lessons (will come from database later)
+const LESSON_DESCRIPTIONS: Record<number, string> = {
+    1: "Master the fundamentals of the boxing stance. Learn proper weight distribution, foot positioning, and how to stay balanced while moving. This is the foundation for all offensive and defensive techniques.",
+    2: "Learn the mechanics of a perfect jab - the most important punch in boxing. We cover hand position, hip rotation, and how to snap the punch back for quick combinations.",
+    3: "The cross is your power punch. In this lesson, we break down the weight transfer from back foot to front, shoulder rotation, and how to generate maximum force safely.",
+    4: "Hooks require precise mechanics to land effectively. Learn the proper arc, elbow angle, and pivoting motion that makes the hook devastating at close range.",
+    5: "Put it all together with basic two and three punch combinations. Practice the jab-cross, jab-jab-cross, and learn how to flow between punches smoothly.",
+};
 
 const AUTOPLAY_COUNTDOWN = 5; // seconds
 
@@ -40,7 +51,7 @@ export default function LessonScreen() {
     // Autoplay state
     const [showAutoplay, setShowAutoplay] = useState(false);
     const [autoplayCountdown, setAutoplayCountdown] = useState(AUTOPLAY_COUNTDOWN);
-    const countdownRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const progressAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
@@ -221,14 +232,27 @@ export default function LessonScreen() {
                     onComplete={handleVideoComplete}
                 />
 
-                {/* Lesson Info */}
+                {/* Lesson Info with Description */}
                 <LessonHeader
                     title={lesson.title}
+                    description={LESSON_DESCRIPTIONS[lesson.order_index] || "Learn essential boxing techniques with step-by-step instruction from Coach Mustafa. Practice along with the video to build your skills."}
                     totalDuration={lesson.duration_seconds}
                     watchedDuration={watchedSeconds}
                 />
 
-                {/* Related Lessons */}
+                {/* Next Up - Course Lessons */}
+                {allLessons.length > 1 && (
+                    <NextUpCourse
+                        lessons={allLessons}
+                        currentLessonId={lesson.id}
+                        courseId={courseId || lesson.course_id}
+                    />
+                )}
+
+                {/* Related Drills */}
+                <RelatedDrills />
+
+                {/* Related Videos */}
                 {allLessons.length > 1 && (
                     <RelatedLessons
                         lessons={allLessons}

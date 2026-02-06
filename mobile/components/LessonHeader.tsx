@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
-import { formatDuration } from '../lib/database';
 
 interface LessonHeaderProps {
     title: string;
+    description?: string;
     instructor?: string;
     totalDuration: number; // in seconds
     watchedDuration?: number; // in seconds
@@ -12,6 +12,7 @@ interface LessonHeaderProps {
 
 export default function LessonHeader({
     title,
+    description,
     instructor = 'Coach Mustafa',
     totalDuration,
     watchedDuration = 0,
@@ -30,6 +31,9 @@ export default function LessonHeader({
                 {formatTimeDisplay(totalDuration)} total
                 {watchedDuration > 0 && ` | ${formatTimeDisplay(watchedDuration)} watched`}
             </Text>
+            {description && (
+                <Text style={styles.description}>{description}</Text>
+            )}
         </View>
     );
 }
@@ -53,5 +57,11 @@ const styles = StyleSheet.create({
     duration: {
         fontSize: 14,
         color: COLORS.textMuted,
+    },
+    description: {
+        fontSize: 15,
+        color: COLORS.textMuted,
+        lineHeight: 22,
+        marginTop: 12,
     },
 });
