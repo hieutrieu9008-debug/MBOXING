@@ -275,9 +275,9 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                     </View>
                 )}
 
-                {/* Controls overlay */}
+                {/* Controls overlay - box-none allows taps to pass through to double-tap zones */}
                 {showControls && !isLoading && (
-                    <View style={styles.controlsOverlay}>
+                    <View style={styles.controlsOverlay} pointerEvents="box-none">
                         {/* Top bar */}
                         <View style={styles.topBar}>
                             {isFullscreen && (
@@ -295,16 +295,16 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                             </TouchableOpacity>
                         </View>
 
-                        {/* Center play button */}
-                        <TouchableOpacity style={styles.centerControls} onPress={togglePlayPause}>
-                            <View style={styles.playButton}>
+                        {/* Center play button - only button area is tappable */}
+                        <View style={styles.centerControls} pointerEvents="box-none">
+                            <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
                                 <Ionicons
                                     name={isPlaying ? 'pause' : 'play'}
                                     size={40}
                                     color={COLORS.background}
                                 />
-                            </View>
-                        </TouchableOpacity>
+                            </TouchableOpacity>
+                        </View>
 
                         {/* Bottom bar */}
                         <View style={styles.bottomBar}>

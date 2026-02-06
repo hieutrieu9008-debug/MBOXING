@@ -53,9 +53,22 @@ export default function CourseDetailScreen() {
         );
     }
 
-    // For demo: first 2 lessons completed, 3rd in progress, rest locked
-    const getIsCompleted = (index: number) => index < 2;
-    const getIsLocked = (index: number, lesson: Lesson) => index >= 3 && !lesson.is_preview;
+    // Track progress (demo: first 2 lessons completed)
+    // TODO: Will be loaded from database in future
+    const [completedCount] = useState(2);
+    const currentLessonIndex = completedCount; // The next lesson to watch
+    const currentLesson = lessons[currentLessonIndex] || lessons[0];
+
+    const getIsCompleted = (index: number) => index < completedCount;
+    const getIsLocked = (index: number, lesson: Lesson) => index >= completedCount + 1 && !lesson.is_preview;
+
+    const handleContinueCourse = () => {
+        if (currentLesson) {
+            router.push(`/lesson/${currentLesson.id}?courseId=${id}`);
+        } else if (lessons.length > 0) {
+            router.push(`/lesson/${lessons[0].id}?courseId=${id}`);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -121,10 +134,35 @@ export default function CourseDetailScreen() {
                 </View>
             </ScrollView>
 
-            {/* Continue Button */}
+            {/* Continue Section */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.continueButton} activeOpacity={0.8}>
-                    <Text style={styles.continueButtonText}>CONTINUE COURSE</Text>
+                {/* Progress Info Box */}
+                {currentLesson && (
+                    <View style={styles.progressBox}>
+                        <View style={styles.progressInfo}>
+                            <Ionicons name="play-circle" size={20} color={COLORS.primary} />
+                            <View style={styles.progressTextContainer}>
+                                <Text style={styles.progressLabel}>Up Next</Text>
+                                <Text style={styles.progressTitle} numberOfLines={1}>
+                                    {currentLessonIndex + 1}. {currentLesson.title}
+                                </Text>
+                            </View>
+                        </View>
+                        <Text style={styles.progressCount}>
+                            {completedCount}/{lessons.length} completed
+                        </Text>
+                    </View>
+                )}
+
+                <TouchableOpacity
+                    style={styles.continueButton}
+                    activeOpacity={0.8}
+                    onPress={handleContinueCourse}
+                >
+                    <Text style={styles.continueButtonText}>
+                        {completedCount === 0 ? 'START COURSE' : 'CONTINUE COURSE'}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -266,10 +304,49 @@ const styles = StyleSheet.create({
         paddingVertical: SIZES.md,
         borderRadius: SIZES.radiusMd,
         alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
     },
     continueButtonText: {
         fontSize: SIZES.fontMd,
         fontWeight: 'bold',
         color: COLORS.background,
+    },
+    // Progress Box
+    progressBox: {
+        backgroundColor: COLORS.card,
+        borderRadius: SIZES.radiusMd,
+        padding: SIZES.md,
+        marginBottom: SIZES.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    progressInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 10,
+    },
+    progressTextContainer: {
+        flex: 1,
+    },
+    progressLabel: {
+        fontSize: 11,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+    progressTitle: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    progressCount: {
+        fontSize: 12,
+        color: COLORS.primary,
+        fontWeight: 'bold',
     },
 });
