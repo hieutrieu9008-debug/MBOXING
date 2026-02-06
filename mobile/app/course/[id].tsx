@@ -11,6 +11,9 @@ export default function CourseDetailScreen() {
     const [course, setCourse] = useState<Course | null>(null);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
+    // Track progress (demo: first 2 lessons completed)
+    // TODO: Will be loaded from database in future
+    const [completedCount] = useState(2);
 
     useEffect(() => {
         async function loadCourseData() {
@@ -53,9 +56,6 @@ export default function CourseDetailScreen() {
         );
     }
 
-    // Track progress (demo: first 2 lessons completed)
-    // TODO: Will be loaded from database in future
-    const [completedCount] = useState(2);
     const currentLessonIndex = completedCount; // The next lesson to watch
     const currentLesson = lessons[currentLessonIndex] || lessons[0];
 
