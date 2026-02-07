@@ -230,6 +230,10 @@ export default function LessonScreen() {
                     videoUrl={getVideoUrl(lesson)}
                     onProgress={handleProgress}
                     onComplete={handleVideoComplete}
+                    nextLessonTitle={nextLesson?.title}
+                    autoplayCountdown={showAutoplay ? autoplayCountdown : 0}
+                    onPlayNext={handleNextLesson}
+                    onCancelAutoplay={cancelAutoplay}
                 />
 
                 {/* Lesson Info with Description */}

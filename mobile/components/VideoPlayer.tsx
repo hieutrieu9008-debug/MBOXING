@@ -21,6 +21,11 @@ interface VideoPlayerProps {
     videoUrl: string | null;
     onProgress?: (position: number, duration: number) => void;
     onComplete?: () => void;
+    // Autoplay props
+    nextLessonTitle?: string;
+    autoplayCountdown?: number; // seconds remaining, 0 = not active
+    onPlayNext?: () => void;
+    onCancelAutoplay?: () => void;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -29,7 +34,15 @@ const CONTROLS_HIDE_DELAY = 3000;
 const SKIP_DURATION = 10000; // 10 seconds in ms
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoPlayerProps) {
+export default function VideoPlayer({
+    videoUrl,
+    onProgress,
+    onComplete,
+    nextLessonTitle,
+    autoplayCountdown = 0,
+    onPlayNext,
+    onCancelAutoplay,
+}: VideoPlayerProps) {
     const videoRef = useRef<Video>(null);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastTapRef = useRef<{ time: number; side: 'left' | 'right' | null }>({ time: 0, side: null });
@@ -337,6 +350,30 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                         </View>
                     </View>
                 )}
+
+                {/* Fullscreen Autoplay Countdown Popup */}
+                {isFullscreen && autoplayCountdown > 0 && nextLessonTitle && (
+                    <TouchableOpacity
+                        style={styles.autoplayPopup}
+                        onPress={onPlayNext}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.autoplayPopupContent}>
+                            <Ionicons name="play-forward" size={18} color={COLORS.primary} />
+                            <View style={styles.autoplayPopupText}>
+                                <Text style={styles.autoplayPopupTitle} numberOfLines={1}>
+                                    {nextLessonTitle}
+                                </Text>
+                                <Text style={styles.autoplayPopupCountdown}>
+                                    in {autoplayCountdown}...
+                                </Text>
+                            </View>
+                            <View style={styles.autoplayPopupBadge}>
+                                <Text style={styles.autoplayPopupBadgeText}>TAP TO PLAY</Text>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -563,6 +600,49 @@ const styles = StyleSheet.create({
     },
     speedOptionTextActive: {
         color: COLORS.primary,
+        fontWeight: 'bold',
+    },
+    // Fullscreen autoplay popup
+    autoplayPopup: {
+        position: 'absolute',
+        bottom: 80,
+        right: 16,
+        zIndex: 100,
+    },
+    autoplayPopupContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+    },
+    autoplayPopupText: {
+        flex: 1,
+        maxWidth: 160,
+    },
+    autoplayPopupTitle: {
+        color: COLORS.text,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    autoplayPopupCountdown: {
+        color: COLORS.primary,
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    autoplayPopupBadge: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    autoplayPopupBadgeText: {
+        color: COLORS.background,
+        fontSize: 10,
         fontWeight: 'bold',
     },
 });
