@@ -21,11 +21,6 @@ interface VideoPlayerProps {
     videoUrl: string | null;
     onProgress?: (position: number, duration: number) => void;
     onComplete?: () => void;
-    // Autoplay props
-    nextLessonTitle?: string;
-    autoplayCountdown?: number; // seconds remaining, 0 = not active
-    onPlayNext?: () => void;
-    onCancelAutoplay?: () => void;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -34,15 +29,7 @@ const CONTROLS_HIDE_DELAY = 3000;
 const SKIP_DURATION = 10000; // 10 seconds in ms
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayer({
-    videoUrl,
-    onProgress,
-    onComplete,
-    nextLessonTitle,
-    autoplayCountdown = 0,
-    onPlayNext,
-    onCancelAutoplay,
-}: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoPlayerProps) {
     const videoRef = useRef<Video>(null);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastTapRef = useRef<{ time: number; side: 'left' | 'right' | null }>({ time: 0, side: null });
@@ -161,8 +148,7 @@ export default function VideoPlayer({
 
         Animated.sequence([
             Animated.timing(skipOpacity, { toValue: 1, duration: 100, useNativeDriver: true }),
-            Animated.delay(500),
-            Animated.timing(skipOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+            Animated.timing(skipOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
         ]).start(() => setSkipFeedback(null));
     };
 
@@ -171,25 +157,16 @@ export default function VideoPlayer({
         const DOUBLE_TAP_DELAY = 300;
 
         if (lastTapRef.current.side === side && now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
-            // Double tap detected
-            skip(side === 'right' ? 'forward' : 'backward');
+            skip(side === 'left' ? 'backward' : 'forward');
             lastTapRef.current = { time: 0, side: null };
         } else {
             lastTapRef.current = { time: now, side };
-            // Single tap fallback - toggle controls after delay
             setTimeout(() => {
                 if (lastTapRef.current.time === now) {
                     setShowControls(!showControls);
                 }
             }, DOUBLE_TAP_DELAY);
         }
-    };
-
-    const changePlaybackSpeed = async (speed: number) => {
-        if (!videoRef.current) return;
-        await videoRef.current.setRateAsync(speed, true);
-        setPlaybackSpeed(speed);
-        setShowSpeedMenu(false);
     };
 
     const toggleFullscreen = async () => {
@@ -200,187 +177,68 @@ export default function VideoPlayer({
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
             setIsFullscreen(true);
         }
+        setShowSpeedMenu(false);
     };
 
-    const handleSlidingStart = () => setIsSeeking(true);
-
-    const handleSlidingComplete = async (value: number) => {
-        setIsSeeking(false);
-        if (videoRef.current && duration > 0) {
-            await videoRef.current.setPositionAsync(value);
-            setPosition(value);
+    const changePlaybackSpeed = async (speed: number) => {
+        if (videoRef.current) {
+            await videoRef.current.setRateAsync(speed, true);
+            setPlaybackSpeed(speed);
+            setShowSpeedMenu(false);
         }
     };
 
-    const handleValueChange = (value: number) => setSeekValue(value);
-
-    const formatTime = (millis: number): string => {
-        const totalSeconds = Math.floor(millis / 1000);
+    const formatTime = (ms: number): string => {
+        const totalSeconds = Math.floor(ms / 1000);
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    if (!videoUrl) {
-        return (
-            <View style={[styles.container, styles.placeholder]}>
-                <Ionicons name="videocam-off" size={48} color={COLORS.textMuted} />
-                <Text style={styles.placeholderText}>Video not available</Text>
-            </View>
-        );
-    }
+    const handleSlidingStart = () => {
+        setIsSeeking(true);
+    };
 
-    const videoContainerStyle = isFullscreen
-        ? styles.fullscreenVideoContainer
-        : styles.videoContainer;
+    const handleSlidingComplete = async (value: number) => {
+        if (videoRef.current) {
+            await videoRef.current.setPositionAsync(value);
+        }
+        setIsSeeking(false);
+    };
 
-    const VideoContent = (
-        <View style={isFullscreen ? styles.fullscreenContainer : styles.container}>
-            {isFullscreen && <StatusBar hidden />}
+    const handleValueChange = (value: number) => {
+        setSeekValue(value);
+    };
 
-            <View style={videoContainerStyle}>
-                <Video
-                    ref={videoRef}
-                    source={{ uri: videoUrl }}
-                    style={styles.video}
-                    resizeMode={ResizeMode.CONTAIN}
-                    shouldPlay={false}
-                    isLooping={false}
-                    isMuted={false}
-                    volume={1.0}
-                    rate={playbackSpeed}
-                    onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-                    useNativeControls={false}
-                />
-
-                {/* Double-tap zones */}
-                <View style={styles.tapZonesContainer}>
-                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('left')}>
-                        <View style={styles.tapZone} />
-                    </TouchableWithoutFeedback>
-                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('right')}>
-                        <View style={styles.tapZone} />
-                    </TouchableWithoutFeedback>
-                </View>
-
-                {/* Skip feedback */}
-                {skipFeedback && (
-                    <Animated.View
+    // Inline speed menu for fullscreen
+    const InlineSpeedMenu = (
+        <View style={styles.inlineSpeedMenu}>
+            <Text style={styles.inlineSpeedTitle}>Speed</Text>
+            {PLAYBACK_SPEEDS.map((speed) => (
+                <TouchableOpacity
+                    key={speed}
+                    style={[
+                        styles.inlineSpeedOption,
+                        playbackSpeed === speed && styles.inlineSpeedOptionActive,
+                    ]}
+                    onPress={() => changePlaybackSpeed(speed)}
+                >
+                    <Text
                         style={[
-                            styles.skipFeedback,
-                            skipFeedback.side === 'left' ? styles.skipFeedbackLeft : styles.skipFeedbackRight,
-                            { opacity: skipOpacity },
+                            styles.inlineSpeedOptionText,
+                            playbackSpeed === speed && styles.inlineSpeedOptionTextActive,
                         ]}
                     >
-                        <Ionicons
-                            name={skipFeedback.side === 'left' ? 'play-back' : 'play-forward'}
-                            size={32}
-                            color="#fff"
-                        />
-                        <Text style={styles.skipFeedbackText}>{skipFeedback.amount}s</Text>
-                    </Animated.View>
-                )}
-
-                {/* Loading Indicator */}
-                {isLoading && (
-                    <View style={styles.overlay}>
-                        <ActivityIndicator size="large" color={COLORS.primary} />
-                    </View>
-                )}
-
-                {/* Controls overlay - box-none allows taps to pass through to double-tap zones */}
-                {showControls && !isLoading && (
-                    <View style={styles.controlsOverlay} pointerEvents="box-none">
-                        {/* Top bar */}
-                        <View style={styles.topBar} pointerEvents="auto">
-                            {isFullscreen && (
-                                <TouchableOpacity onPress={toggleFullscreen} style={styles.backButton}>
-                                    <Ionicons name="arrow-back" size={24} color="#fff" />
-                                </TouchableOpacity>
-                            )}
-                            <View style={{ flex: 1 }} />
-                            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-                                <Ionicons
-                                    name={isFullscreen ? 'contract' : 'expand'}
-                                    size={22}
-                                    color="#fff"
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Center play button - only button area is tappable */}
-                        <View style={styles.centerControls} pointerEvents="box-none">
-                            <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-                                <Ionicons
-                                    name={isPlaying ? 'pause' : 'play'}
-                                    size={40}
-                                    color={COLORS.background}
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Bottom bar */}
-                        <View style={styles.bottomBar} pointerEvents="auto">
-                            <Text style={styles.timeText}>{formatTime(isSeeking ? seekValue : position)}</Text>
-
-                            <View style={styles.sliderContainer}>
-                                <Slider
-                                    style={styles.slider}
-                                    minimumValue={0}
-                                    maximumValue={duration || 1}
-                                    value={isSeeking ? seekValue : position}
-                                    onSlidingStart={handleSlidingStart}
-                                    onSlidingComplete={handleSlidingComplete}
-                                    onValueChange={handleValueChange}
-                                    minimumTrackTintColor={COLORS.primary}
-                                    maximumTrackTintColor="rgba(255,255,255,0.3)"
-                                    thumbTintColor={COLORS.primary}
-                                />
-                            </View>
-
-                            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-
-                            {/* Speed button */}
-                            <TouchableOpacity
-                                onPress={() => setShowSpeedMenu(true)}
-                                style={styles.speedButton}
-                            >
-                                <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* Fullscreen Autoplay Countdown Popup */}
-                {isFullscreen && autoplayCountdown > 0 && nextLessonTitle && (
-                    <TouchableOpacity
-                        style={styles.autoplayPopup}
-                        onPress={onPlayNext}
-                        activeOpacity={0.8}
-                    >
-                        <View style={styles.autoplayPopupContent}>
-                            <Ionicons name="play-forward" size={18} color={COLORS.primary} />
-                            <View style={styles.autoplayPopupText}>
-                                <Text style={styles.autoplayPopupTitle} numberOfLines={1}>
-                                    {nextLessonTitle}
-                                </Text>
-                                <Text style={styles.autoplayPopupCountdown}>
-                                    in {autoplayCountdown}...
-                                </Text>
-                            </View>
-                            <View style={styles.autoplayPopupBadge}>
-                                <Text style={styles.autoplayPopupBadgeText}>TAP TO PLAY</Text>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                )}
-            </View>
+                        {speed}x
+                    </Text>
+                </TouchableOpacity>
+            ))}
         </View>
     );
 
-    // Speed menu - rendered separately to avoid nesting inside fullscreen modal
-    const SpeedMenu = (
-        <Modal visible={showSpeedMenu} transparent animationType="fade">
+    // Modal speed menu for non-fullscreen
+    const ModalSpeedMenu = (
+        <Modal visible={showSpeedMenu && !isFullscreen} transparent animationType="fade">
             <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
@@ -415,14 +273,139 @@ export default function VideoPlayer({
         </Modal>
     );
 
+    const VideoContent = (
+        <View style={isFullscreen ? styles.fullscreenContainer : styles.container}>
+            <View style={isFullscreen ? styles.fullscreenVideoContainer : styles.videoContainer}>
+                {videoUrl ? (
+                    <Video
+                        ref={videoRef}
+                        source={{ uri: videoUrl }}
+                        style={styles.video}
+                        resizeMode={ResizeMode.CONTAIN}
+                        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+                        shouldPlay={false}
+                        isLooping={false}
+                    />
+                ) : (
+                    <View style={styles.placeholder}>
+                        <Ionicons name="videocam-off" size={48} color={COLORS.textMuted} />
+                        <Text style={styles.placeholderText}>Video not available</Text>
+                    </View>
+                )}
+
+                {/* Double tap zones */}
+                <View style={styles.tapZonesContainer}>
+                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('left')}>
+                        <View style={styles.tapZoneLeft} />
+                    </TouchableWithoutFeedback>
+                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('right')}>
+                        <View style={styles.tapZoneRight} />
+                    </TouchableWithoutFeedback>
+                </View>
+
+                {/* Skip feedback */}
+                {skipFeedback && (
+                    <Animated.View
+                        style={[
+                            styles.skipFeedback,
+                            skipFeedback.side === 'left' ? styles.skipFeedbackLeft : styles.skipFeedbackRight,
+                            { opacity: skipOpacity },
+                        ]}
+                    >
+                        <Ionicons
+                            name={skipFeedback.side === 'left' ? 'play-back' : 'play-forward'}
+                            size={28}
+                            color="#fff"
+                        />
+                        <Text style={styles.skipFeedbackText}>{skipFeedback.amount}s</Text>
+                    </Animated.View>
+                )}
+
+                {/* Loading indicator */}
+                {isLoading && videoUrl && (
+                    <View style={styles.loadingOverlay}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                    </View>
+                )}
+
+                {/* Controls overlay */}
+                {showControls && !isLoading && (
+                    <View style={styles.controlsOverlay} pointerEvents="box-none">
+                        {/* Top bar */}
+                        <View style={styles.topBar} pointerEvents="auto">
+                            {isFullscreen && (
+                                <TouchableOpacity onPress={toggleFullscreen} style={styles.backButton}>
+                                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            )}
+                            <View style={{ flex: 1 }} />
+                            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
+                                <Ionicons
+                                    name={isFullscreen ? 'contract' : 'expand'}
+                                    size={22}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Center controls */}
+                        <View style={styles.centerControls} pointerEvents="box-none">
+                            <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+                                <Ionicons
+                                    name={isPlaying ? 'pause' : 'play'}
+                                    size={40}
+                                    color={COLORS.background}
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Bottom bar */}
+                        <View style={styles.bottomBar} pointerEvents="auto">
+                            <Text style={styles.timeText}>{formatTime(isSeeking ? seekValue : position)}</Text>
+
+                            <View style={styles.sliderContainer}>
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={0}
+                                    maximumValue={duration || 1}
+                                    value={isSeeking ? seekValue : position}
+                                    onSlidingStart={handleSlidingStart}
+                                    onSlidingComplete={handleSlidingComplete}
+                                    onValueChange={handleValueChange}
+                                    minimumTrackTintColor={COLORS.primary}
+                                    maximumTrackTintColor="rgba(255,255,255,0.3)"
+                                    thumbTintColor={COLORS.primary}
+                                />
+                            </View>
+
+                            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+
+                            {/* Speed button */}
+                            <TouchableOpacity
+                                onPress={() => setShowSpeedMenu(!showSpeedMenu)}
+                                style={styles.speedButton}
+                            >
+                                <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {/* Inline speed menu for fullscreen */}
+                {isFullscreen && showSpeedMenu && InlineSpeedMenu}
+            </View>
+        </View>
+    );
+
     // Wrap in modal for fullscreen
     if (isFullscreen) {
         return (
             <>
                 <Modal visible={isFullscreen} animationType="fade" supportedOrientations={['landscape']}>
+                    <StatusBar hidden />
                     {VideoContent}
                 </Modal>
-                {SpeedMenu}
+                {ModalSpeedMenu}
             </>
         );
     }
@@ -430,7 +413,7 @@ export default function VideoPlayer({
     return (
         <>
             {VideoContent}
-            {SpeedMenu}
+            {ModalSpeedMenu}
         </>
     );
 }
@@ -448,10 +431,12 @@ const styles = StyleSheet.create({
         width: '100%',
         height: VIDEO_HEIGHT,
         backgroundColor: '#000',
+        position: 'relative',
     },
     fullscreenVideoContainer: {
         flex: 1,
         backgroundColor: '#000',
+        position: 'relative',
     },
     video: {
         width: '100%',
@@ -461,31 +446,36 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         flexDirection: 'row',
     },
-    tapZone: {
+    tapZoneLeft: {
+        flex: 1,
+    },
+    tapZoneRight: {
         flex: 1,
     },
     skipFeedback: {
         position: 'absolute',
         top: '50%',
-        marginTop: -40,
+        marginTop: -30,
+        width: 80,
+        height: 60,
+        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        borderRadius: 50,
-        padding: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        borderRadius: 12,
     },
     skipFeedbackLeft: {
-        left: '15%',
+        left: 30,
     },
     skipFeedbackRight: {
-        right: '15%',
+        right: 30,
     },
     skipFeedbackText: {
         color: '#fff',
         fontSize: 14,
         fontWeight: 'bold',
-        marginTop: 4,
+        marginTop: 2,
     },
-    overlay: {
+    loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
         alignItems: 'center',
@@ -493,7 +483,6 @@ const styles = StyleSheet.create({
     },
     controlsOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
         justifyContent: 'space-between',
     },
     topBar: {
@@ -564,6 +553,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 8,
     },
+    // Modal speed menu (non-fullscreen)
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -602,47 +592,41 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         fontWeight: 'bold',
     },
-    // Fullscreen autoplay popup
-    autoplayPopup: {
+    // Inline speed menu (fullscreen)
+    inlineSpeedMenu: {
         position: 'absolute',
-        bottom: 80,
         right: 16,
-        zIndex: 100,
-    },
-    autoplayPopupContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        bottom: 80,
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
         borderRadius: 12,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        gap: 10,
+        padding: 12,
         borderWidth: 1,
-        borderColor: COLORS.primary,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
-    autoplayPopupText: {
-        flex: 1,
-        maxWidth: 160,
-    },
-    autoplayPopupTitle: {
-        color: COLORS.text,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    autoplayPopupCountdown: {
-        color: COLORS.primary,
+    inlineSpeedTitle: {
+        color: '#fff',
         fontSize: 12,
         fontWeight: 'bold',
+        marginBottom: 8,
+        textAlign: 'center',
+        opacity: 0.7,
     },
-    autoplayPopupBadge: {
-        backgroundColor: COLORS.primary,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+    inlineSpeedOption: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         borderRadius: 6,
+        marginVertical: 2,
     },
-    autoplayPopupBadgeText: {
+    inlineSpeedOptionActive: {
+        backgroundColor: COLORS.primary,
+    },
+    inlineSpeedOptionText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    inlineSpeedOptionTextActive: {
         color: COLORS.background,
-        fontSize: 10,
-        fontWeight: 'bold',
     },
 });
