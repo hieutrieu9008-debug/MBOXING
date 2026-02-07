@@ -10,6 +10,8 @@ import {
     Animated,
     Modal,
     StatusBar,
+    BackHandler,
+    Platform,
 } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus, Audio } from 'expo-av';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -23,8 +25,9 @@ interface VideoPlayerProps {
     onComplete?: () => void;
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const VIDEO_HEIGHT = SCREEN_WIDTH * (9 / 16);
+const WINDOW = Dimensions.get('window');
+const SCREEN = Dimensions.get('screen');
+const VIDEO_HEIGHT = WINDOW.width * (9 / 16);
 const CONTROLS_HIDE_DELAY = 3000;
 const SKIP_DURATION = 10000; // 10 seconds in ms
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -44,6 +47,7 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [showSpeedMenu, setShowSpeedMenu] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [dimensions, setDimensions] = useState({ width: WINDOW.width, height: WINDOW.height });
 
     // Skip feedback animations
     const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; amount: number } | null>(null);
@@ -65,6 +69,27 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
         setupAudio();
     }, []);
 
+    // Track dimension changes
+    useEffect(() => {
+        const subscription = Dimensions.addEventListener('change', ({ window }) => {
+            setDimensions({ width: window.width, height: window.height });
+        });
+        return () => subscription?.remove();
+    }, []);
+
+    // Handle back button for fullscreen exit
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+            if (isFullscreen) {
+                exitFullscreen();
+                return true;
+            }
+            return false;
+        });
+
+        return () => backHandler.remove();
+    }, [isFullscreen]);
+
     // Auto-hide controls
     useEffect(() => {
         if (isPlaying && showControls && !isSeeking && !showSpeedMenu) {
@@ -81,7 +106,7 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
                 clearTimeout(controlsTimeoutRef.current);
             }
         };
-    }, [isPlaying, showControls, isSeeking, showSpeedMenu, isFullscreen]);
+    }, [isPlaying, showControls, isSeeking, showSpeedMenu]);
 
     // Show controls when paused
     useEffect(() => {
@@ -93,11 +118,9 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
     // Cleanup fullscreen on unmount
     useEffect(() => {
         return () => {
-            if (isFullscreen) {
-                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-            }
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         };
-    }, [isFullscreen]);
+    }, []);
 
     const handlePlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
         if (!status.isLoaded) {
@@ -169,15 +192,32 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
         }
     };
 
+    const enterFullscreen = async () => {
+        try {
+            setShowSpeedMenu(false);
+            setIsFullscreen(true);
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        } catch (error) {
+            console.log('Error entering fullscreen:', error);
+        }
+    };
+
+    const exitFullscreen = async () => {
+        try {
+            setShowSpeedMenu(false);
+            setIsFullscreen(false);
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        } catch (error) {
+            console.log('Error exiting fullscreen:', error);
+        }
+    };
+
     const toggleFullscreen = async () => {
         if (isFullscreen) {
-            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-            setIsFullscreen(false);
+            await exitFullscreen();
         } else {
-            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-            setIsFullscreen(true);
+            await enterFullscreen();
         }
-        setShowSpeedMenu(false);
     };
 
     const changePlaybackSpeed = async (speed: number) => {
@@ -210,10 +250,27 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
         setSeekValue(value);
     };
 
-    // Inline speed menu for fullscreen
+    // Calculate fullscreen dimensions
+    const getFullscreenStyle = () => {
+        // Use the larger dimension as width (landscape)
+        const width = Math.max(dimensions.width, dimensions.height);
+        const height = Math.min(dimensions.width, dimensions.height);
+        return {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: width,
+            height: height,
+            zIndex: 9999,
+            backgroundColor: '#000',
+        };
+    };
+
+    // Inline speed menu for fullscreen - compact, no title
     const InlineSpeedMenu = (
         <View style={styles.inlineSpeedMenu}>
-            <Text style={styles.inlineSpeedTitle}>Speed</Text>
             {PLAYBACK_SPEEDS.map((speed) => (
                 <TouchableOpacity
                     key={speed}
@@ -273,146 +330,144 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
         </Modal>
     );
 
-    const VideoContent = (
-        <View style={isFullscreen ? styles.fullscreenContainer : styles.container}>
-            <View style={isFullscreen ? styles.fullscreenVideoContainer : styles.videoContainer}>
-                {videoUrl ? (
-                    <Video
-                        ref={videoRef}
-                        source={{ uri: videoUrl }}
-                        style={styles.video}
-                        resizeMode={ResizeMode.CONTAIN}
-                        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-                        shouldPlay={false}
-                        isLooping={false}
-                    />
-                ) : (
-                    <View style={styles.placeholder}>
-                        <Ionicons name="videocam-off" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.placeholderText}>Video not available</Text>
-                    </View>
-                )}
-
-                {/* Double tap zones */}
-                <View style={styles.tapZonesContainer}>
-                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('left')}>
-                        <View style={styles.tapZoneLeft} />
-                    </TouchableWithoutFeedback>
-                    <TouchableWithoutFeedback onPress={() => handleDoubleTap('right')}>
-                        <View style={styles.tapZoneRight} />
-                    </TouchableWithoutFeedback>
+    // The actual video content - same component used in both modes
+    const videoContent = (
+        <>
+            {videoUrl ? (
+                <Video
+                    ref={videoRef}
+                    source={{ uri: videoUrl }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode={ResizeMode.CONTAIN}
+                    onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+                    shouldPlay={false}
+                    isLooping={false}
+                />
+            ) : (
+                <View style={styles.placeholder}>
+                    <Ionicons name="videocam-off" size={48} color={COLORS.textMuted} />
+                    <Text style={styles.placeholderText}>Video not available</Text>
                 </View>
+            )}
 
-                {/* Skip feedback */}
-                {skipFeedback && (
-                    <Animated.View
-                        style={[
-                            styles.skipFeedback,
-                            skipFeedback.side === 'left' ? styles.skipFeedbackLeft : styles.skipFeedbackRight,
-                            { opacity: skipOpacity },
-                        ]}
-                    >
-                        <Ionicons
-                            name={skipFeedback.side === 'left' ? 'play-back' : 'play-forward'}
-                            size={28}
-                            color="#fff"
-                        />
-                        <Text style={styles.skipFeedbackText}>{skipFeedback.amount}s</Text>
-                    </Animated.View>
-                )}
-
-                {/* Loading indicator */}
-                {isLoading && videoUrl && (
-                    <View style={styles.loadingOverlay}>
-                        <ActivityIndicator size="large" color={COLORS.primary} />
-                    </View>
-                )}
-
-                {/* Controls overlay */}
-                {showControls && !isLoading && (
-                    <View style={styles.controlsOverlay} pointerEvents="box-none">
-                        {/* Top bar */}
-                        <View style={styles.topBar} pointerEvents="auto">
-                            {isFullscreen && (
-                                <TouchableOpacity onPress={toggleFullscreen} style={styles.backButton}>
-                                    <Ionicons name="arrow-back" size={24} color="#fff" />
-                                </TouchableOpacity>
-                            )}
-                            <View style={{ flex: 1 }} />
-                            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-                                <Ionicons
-                                    name={isFullscreen ? 'contract' : 'expand'}
-                                    size={22}
-                                    color="#fff"
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Center controls */}
-                        <View style={styles.centerControls} pointerEvents="box-none">
-                            <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-                                <Ionicons
-                                    name={isPlaying ? 'pause' : 'play'}
-                                    size={40}
-                                    color={COLORS.background}
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Bottom bar */}
-                        <View style={styles.bottomBar} pointerEvents="auto">
-                            <Text style={styles.timeText}>{formatTime(isSeeking ? seekValue : position)}</Text>
-
-                            <View style={styles.sliderContainer}>
-                                <Slider
-                                    style={styles.slider}
-                                    minimumValue={0}
-                                    maximumValue={duration || 1}
-                                    value={isSeeking ? seekValue : position}
-                                    onSlidingStart={handleSlidingStart}
-                                    onSlidingComplete={handleSlidingComplete}
-                                    onValueChange={handleValueChange}
-                                    minimumTrackTintColor={COLORS.primary}
-                                    maximumTrackTintColor="rgba(255,255,255,0.3)"
-                                    thumbTintColor={COLORS.primary}
-                                />
-                            </View>
-
-                            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-
-                            {/* Speed button */}
-                            <TouchableOpacity
-                                onPress={() => setShowSpeedMenu(!showSpeedMenu)}
-                                style={styles.speedButton}
-                            >
-                                <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* Inline speed menu for fullscreen */}
-                {isFullscreen && showSpeedMenu && InlineSpeedMenu}
+            {/* Double tap zones */}
+            <View style={styles.tapZonesContainer}>
+                <TouchableWithoutFeedback onPress={() => handleDoubleTap('left')}>
+                    <View style={styles.tapZoneLeft} />
+                </TouchableWithoutFeedback>
+                <TouchableWithoutFeedback onPress={() => handleDoubleTap('right')}>
+                    <View style={styles.tapZoneRight} />
+                </TouchableWithoutFeedback>
             </View>
-        </View>
-    );
 
-    // Wrap in modal for fullscreen
-    if (isFullscreen) {
-        return (
-            <>
-                <Modal visible={isFullscreen} animationType="fade" supportedOrientations={['landscape']}>
-                    <StatusBar hidden />
-                    {VideoContent}
-                </Modal>
-                {ModalSpeedMenu}
-            </>
-        );
-    }
+            {/* Skip feedback */}
+            {skipFeedback && (
+                <Animated.View
+                    style={[
+                        styles.skipFeedback,
+                        skipFeedback.side === 'left' ? styles.skipFeedbackLeft : styles.skipFeedbackRight,
+                        { opacity: skipOpacity },
+                    ]}
+                >
+                    <Ionicons
+                        name={skipFeedback.side === 'left' ? 'play-back' : 'play-forward'}
+                        size={28}
+                        color="#fff"
+                    />
+                    <Text style={styles.skipFeedbackText}>{skipFeedback.amount}s</Text>
+                </Animated.View>
+            )}
+
+            {/* Loading indicator */}
+            {isLoading && videoUrl && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            )}
+
+            {/* Controls overlay */}
+            {showControls && !isLoading && (
+                <View style={styles.controlsOverlay} pointerEvents="box-none">
+                    {/* Top bar */}
+                    <View style={[styles.topBar, isFullscreen && styles.topBarFullscreen]} pointerEvents="auto">
+                        {isFullscreen && (
+                            <TouchableOpacity onPress={exitFullscreen} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        )}
+                        <View style={{ flex: 1 }} />
+                        <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
+                            <Ionicons
+                                name={isFullscreen ? 'contract' : 'expand'}
+                                size={22}
+                                color="#fff"
+                            />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Center controls */}
+                    <View style={styles.centerControls} pointerEvents="box-none">
+                        <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+                            <Ionicons
+                                name={isPlaying ? 'pause' : 'play'}
+                                size={40}
+                                color={COLORS.background}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Bottom bar */}
+                    <View style={[styles.bottomBar, isFullscreen && styles.bottomBarFullscreen]} pointerEvents="auto">
+                        <Text style={styles.timeText}>{formatTime(isSeeking ? seekValue : position)}</Text>
+
+                        <View style={styles.sliderContainer}>
+                            <Slider
+                                style={styles.slider}
+                                minimumValue={0}
+                                maximumValue={duration || 1}
+                                value={isSeeking ? seekValue : position}
+                                onSlidingStart={handleSlidingStart}
+                                onSlidingComplete={handleSlidingComplete}
+                                onValueChange={handleValueChange}
+                                minimumTrackTintColor={COLORS.primary}
+                                maximumTrackTintColor="rgba(255,255,255,0.3)"
+                                thumbTintColor={COLORS.primary}
+                            />
+                        </View>
+
+                        <Text style={styles.timeText}>{formatTime(duration)}</Text>
+
+                        {/* Speed button */}
+                        <TouchableOpacity
+                            onPress={() => setShowSpeedMenu(!showSpeedMenu)}
+                            style={styles.speedButton}
+                        >
+                            <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Inline speed menu for fullscreen */}
+            {isFullscreen && showSpeedMenu && InlineSpeedMenu}
+        </>
+    );
 
     return (
         <>
-            {VideoContent}
+            {/* Hide status bar in fullscreen */}
+            <StatusBar hidden={isFullscreen} />
+
+            {/* Video container */}
+            <View style={isFullscreen ? getFullscreenStyle() : styles.container}>
+                <View style={isFullscreen ? styles.fullscreenVideoContainer : styles.videoContainer}>
+                    {videoContent}
+                </View>
+            </View>
+
+            {/* Placeholder to maintain layout when fullscreen */}
+            {isFullscreen && <View style={{ height: VIDEO_HEIGHT }} />}
+
             {ModalSpeedMenu}
         </>
     );
@@ -421,10 +476,6 @@ export default function VideoPlayer({ videoUrl, onProgress, onComplete }: VideoP
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        backgroundColor: '#000',
-    },
-    fullscreenContainer: {
-        flex: 1,
         backgroundColor: '#000',
     },
     videoContainer: {
@@ -437,10 +488,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000',
         position: 'relative',
-    },
-    video: {
-        width: '100%',
-        height: '100%',
     },
     tapZonesContainer: {
         ...StyleSheet.absoluteFillObject,
@@ -488,7 +535,11 @@ const styles = StyleSheet.create({
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        padding: 12,
+    },
+    topBarFullscreen: {
+        paddingTop: 16,
+        paddingHorizontal: 24,
     },
     backButton: {
         padding: 8,
@@ -513,8 +564,12 @@ const styles = StyleSheet.create({
     bottomBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        padding: 12,
+        paddingBottom: 16,
+    },
+    bottomBarFullscreen: {
         paddingBottom: 24,
+        paddingHorizontal: 24,
     },
     timeText: {
         color: '#fff',
@@ -544,7 +599,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     placeholder: {
-        height: VIDEO_HEIGHT,
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -592,37 +647,31 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         fontWeight: 'bold',
     },
-    // Inline speed menu (fullscreen)
+    // Inline speed menu (fullscreen) - compact, no title
     inlineSpeedMenu: {
         position: 'absolute',
-        right: 16,
-        bottom: 80,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
-        borderRadius: 12,
-        padding: 12,
+        right: 24,
+        top: '50%',
+        marginTop: -80,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        borderRadius: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 4,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    inlineSpeedTitle: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        textAlign: 'center',
-        opacity: 0.7,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     inlineSpeedOption: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 6,
-        marginVertical: 2,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderRadius: 4,
+        marginVertical: 1,
     },
     inlineSpeedOptionActive: {
         backgroundColor: COLORS.primary,
     },
     inlineSpeedOptionText: {
         color: '#fff',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         textAlign: 'center',
     },
