@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { validateSignupForm } from '../../lib/validation'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
 import { colors, typography, spacing, layout } from '../../constants/theme'
