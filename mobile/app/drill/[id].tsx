@@ -26,6 +26,7 @@ import {
   DrillPractice,
 } from '../../lib/spaced-repetition'
 import Button from '../../components/Button'
+import { showSuccess, showError } from '../../lib/toast'
 
 export default function DrillDetailScreen() {
   const router = useRouter()
@@ -78,7 +79,7 @@ export default function DrillDetailScreen() {
   async function handleLogReps() {
     const repsNum = parseInt(reps)
     if (isNaN(repsNum) || repsNum <= 0) {
-      Alert.alert('Invalid Reps', 'Please enter a valid number of reps')
+      showError('Invalid Reps', 'Please enter a valid number of reps')
       return
     }
 
@@ -94,10 +95,10 @@ export default function DrillDetailScreen() {
         // Show quality rating for spaced repetition
         setShowQualityRating(true)
       } else {
-        Alert.alert('Error', 'Failed to log reps')
+        showError('Failed', 'Could not log reps. Please try again.')
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to log reps')
+      showError('Error', 'An unexpected error occurred')
     } finally {
       setLogging(false)
     }
@@ -108,10 +109,9 @@ export default function DrillDetailScreen() {
     loadPractice()
     setShowQualityRating(false)
     
-    Alert.alert(
+    showSuccess(
       'Great work! 🥊',
-      `Reps logged successfully. Next practice scheduled.`,
-      [{ text: 'OK' }]
+      'Reps logged successfully. Next practice scheduled.'
     )
   }
 
