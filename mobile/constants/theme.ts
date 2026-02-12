@@ -1,117 +1,194 @@
 /**
- * Mustafa's Boxing - Design System Theme
- * Based on mockup designs with Championship Gold accent
+ * DESIGN SYSTEM - Mustafa's Boxing App
+ * Premium, professional, intensity-focused
  */
 
-export const COLORS = {
-  // Core colors
-  background: '#000000',
-  primary: '#D4AF37',      // Championship Gold
-  accent: '#DC143C',       // Crimson Red
+// COLOR PALETTE
+export const colors = {
+  // Primary: Boxing Red (intensity, power)
+  primary: {
+    50: '#FFF1F0',
+    100: '#FFE1DE',
+    200: '#FFC7C2',
+    300: '#FFA199',
+    400: '#FF6B5E',
+    500: '#FF4433', // Main brand color
+    600: '#ED2615',
+    700: '#C8190B',
+    800: '#A5180D',
+    900: '#881A12',
+  },
 
-  // Text colors
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  textSecondary: '#AAAAAA',
+  // Accent: Gold (championship, achievement)
+  accent: {
+    50: '#FFFBEB',
+    100: '#FEF3C7',
+    200: '#FDE68A',
+    300: '#FCD34D',
+    400: '#FBBF24',
+    500: '#F59E0B', // Main accent
+    600: '#D97706',
+    700: '#B45309',
+    800: '#92400E',
+    900: '#78350F',
+  },
 
-  // UI colors
-  card: '#1A1A1A',
-  cardHover: '#222222',
-  surface: '#1A1A1A',       // Same as card, for surface elements
-  border: '#333333',
-  primaryLight: '#FFD700',  // Lighter gold for active states
+  // Neutrals: Dark mode friendly
+  neutral: {
+    0: '#FFFFFF',
+    50: '#F9FAFB',
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    300: '#D1D5DB',
+    400: '#9CA3AF',
+    500: '#6B7280',
+    600: '#4B5563',
+    700: '#374151',
+    800: '#1F2937', // Dark backgrounds
+    900: '#111827',
+    950: '#030712', // Darkest
+  },
 
-  // Status colors
-  success: '#22C55E',
+  // Semantic colors
+  success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  info: '#3B82F6',
 
-  // Difficulty colors
-  beginner: '#22C55E',
-  intermediate: '#F59E0B',
-  advanced: '#EF4444',
-};
+  // App-specific
+  background: {
+    primary: '#030712', // Almost black
+    secondary: '#111827', // Dark gray
+    tertiary: '#1F2937', // Lighter gray
+    card: '#1F2937',
+  },
 
-export const FONTS = {
-  // Will use system fonts for now, can add custom fonts later
-  regular: 'System',
-  medium: 'System',
-  bold: 'System',
-};
+  text: {
+    primary: '#F9FAFB', // Almost white
+    secondary: '#D1D5DB', // Light gray
+    tertiary: '#9CA3AF', // Medium gray
+    disabled: '#6B7280',
+  },
 
-export const SIZES = {
-  // Spacing
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
+  border: {
+    subtle: '#374151',
+    default: '#4B5563',
+    strong: '#6B7280',
+  },
+}
 
-  // Border radius
-  radiusSm: 8,
-  radiusMd: 12,
-  radiusLg: 16,
-  radiusXl: 24,
+// TYPOGRAPHY
+export const typography = {
+  fonts: {
+    regular: 'System',
+    medium: 'System',
+    semibold: 'System',
+    bold: 'System',
+  },
 
-  // Font sizes
-  fontXs: 12,
-  fontSm: 14,
-  fontMd: 16,
-  fontLg: 18,
-  fontXl: 24,
-  fontXxl: 32,
-  fontHero: 48,
-};
+  sizes: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    '2xl': 24,
+    '3xl': 30,
+    '4xl': 36,
+    '5xl': 48,
+  },
 
-export const SHADOWS = {
-  small: {
+  lineHeights: {
+    tight: 1.25,
+    normal: 1.5,
+    relaxed: 1.75,
+  },
+}
+
+// SPACING (4px grid system)
+export const spacing = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
+  10: 40,
+  12: 48,
+  16: 64,
+  20: 80,
+  24: 96,
+}
+
+// BORDER RADIUS
+export const radius = {
+  none: 0,
+  sm: 4,
+  base: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
+}
+
+// SHADOWS (for cards, buttons)
+export const shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  base: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  medium: {
+  md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
     elevation: 4,
   },
-  large: {
+  lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
     elevation: 8,
   },
-};
+}
 
-// Difficulty badge colors
-export const getDifficultyColor = (difficulty: string) => {
-  switch (difficulty.toLowerCase()) {
-    case 'beginner':
-      return COLORS.beginner;
-    case 'intermediate':
-      return COLORS.intermediate;
-    case 'advanced':
-      return COLORS.advanced;
-    default:
-      return COLORS.primary;
-  }
-};
+// LAYOUT
+export const layout = {
+  screenPadding: spacing[4], // 16px
+  cardPadding: spacing[4], // 16px
+  sectionSpacing: spacing[6], // 24px
+  maxContentWidth: 640,
+}
 
-// Category icons (for Ionicons)
-export const getCategoryIcon = (category: string) => {
-  switch (category.toLowerCase()) {
-    case 'boxing':
-      return 'fitness';
-    case 'footwork':
-      return 'footsteps';
-    case 'defense':
-      return 'shield';
-    default:
-      return 'flash';
-  }
-};
+// ANIMATION DURATIONS
+export const animation = {
+  fast: 150,
+  base: 250,
+  slow: 350,
+}
+
+// Export as default theme object
+export const theme = {
+  colors,
+  typography,
+  spacing,
+  radius,
+  shadows,
+  layout,
+  animation,
+}
+
+export default theme
