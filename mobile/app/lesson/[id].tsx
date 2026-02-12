@@ -1,296 +1,299 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants/theme';
+import React, { useState, useEffect, useRef } from 'react'
 import {
-    getLessonById,
-    getLessonsByCourseId,
-    getNextLesson,
-    getCourseById,
-    Lesson,
-    Course,
-} from '../../lib/database';
-import VideoPlayer from '../../components/VideoPlayer';
-import LessonHeader from '../../components/LessonHeader';
-import NextUpCourse from '../../components/NextUpCourse';
-import RelatedDrills from '../../components/RelatedDrills';
-import RelatedLessons from '../../components/RelatedLessons';
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+  Platform,
+} from 'react-native'
+import { useRouter, useLocalSearchParams } from 'expo-router'
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av'
+import * as ScreenOrientation from 'expo-screen-orientation'
+import { colors, typography, spacing } from '../../constants/theme'
+import { supabase } from '../../lib/supabase'
+import Button from '../../components/Button'
 
-// Sample video URLs for demo
-const SAMPLE_VIDEOS = [
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-];
-
-// Demo descriptions for lessons (will come from database later)
-const LESSON_DESCRIPTIONS: Record<number, string> = {
-    1: "Master the fundamentals of the boxing stance. Learn proper weight distribution, foot positioning, and how to stay balanced while moving. This is the foundation for all offensive and defensive techniques.",
-    2: "Learn the mechanics of a perfect jab - the most important punch in boxing. We cover hand position, hip rotation, and how to snap the punch back for quick combinations.",
-    3: "The cross is your power punch. In this lesson, we break down the weight transfer from back foot to front, shoulder rotation, and how to generate maximum force safely.",
-    4: "Hooks require precise mechanics to land effectively. Learn the proper arc, elbow angle, and pivoting motion that makes the hook devastating at close range.",
-    5: "Put it all together with basic two and three punch combinations. Practice the jab-cross, jab-jab-cross, and learn how to flow between punches smoothly.",
-};
+interface Lesson {
+  id: string
+  course_id: string
+  title: string
+  description: string
+  video_url: string
+  video_duration: number
+  order_index: number
+}
 
 export default function LessonScreen() {
-    const { id, courseId } = useLocalSearchParams<{ id: string; courseId: string }>();
-    const router = useRouter();
+  const router = useRouter()
+  const { id } = useLocalSearchParams()
+  const videoRef = useRef<Video>(null)
 
-    const [lesson, setLesson] = useState<Lesson | null>(null);
-    const [course, setCourse] = useState<Course | null>(null);
-    const [allLessons, setAllLessons] = useState<Lesson[]>([]);
-    const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [watchedSeconds, setWatchedSeconds] = useState(0);
-    const [isCompleted, setIsCompleted] = useState(false);
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [position, setPosition] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-    useEffect(() => {
-        loadLesson();
-    }, [id, courseId]);
-
-    const loadLesson = async () => {
-        if (!id) return;
-
-        setIsLoading(true);
-
-        const lessonData = await getLessonById(id);
-        setLesson(lessonData);
-
-        if (lessonData && (courseId || lessonData.course_id)) {
-            const actualCourseId = courseId || lessonData.course_id;
-
-            const courseData = await getCourseById(actualCourseId);
-            setCourse(courseData);
-
-            const lessons = await getLessonsByCourseId(actualCourseId);
-            setAllLessons(lessons);
-
-            const next = await getNextLesson(actualCourseId, lessonData.order_index);
-            setNextLesson(next);
-        }
-
-        setIsLoading(false);
-    };
-
-    const handleProgress = useCallback((positionMs: number, durationMs: number) => {
-        setWatchedSeconds(Math.floor(positionMs / 1000));
-    }, []);
-
-    const handleVideoComplete = useCallback(() => {
-        console.log('Video finished playing');
-    }, []);
-
-    const handleToggleComplete = () => {
-        setIsCompleted(!isCompleted);
-        // TODO: Save completion status to database
-    };
-
-    const handleNextLesson = () => {
-        if (nextLesson && courseId) {
-            router.replace(`/lesson/${nextLesson.id}?courseId=${courseId}` as any);
-        }
-    };
-
-    const getVideoUrl = (lessonData: Lesson): string => {
-        if (lessonData.video_url) {
-            return lessonData.video_url;
-        }
-        const index = (lessonData.order_index - 1) % SAMPLE_VIDEOS.length;
-        return SAMPLE_VIDEOS[index];
-    };
-
-    if (isLoading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
-        );
+  useEffect(() => {
+    if (id) {
+      loadLesson()
     }
 
-    if (!lesson) {
-        return (
-            <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={48} color={COLORS.error} />
-                <Text style={styles.errorText}>Lesson not found</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backButtonText}>Go Back</Text>
-                </TouchableOpacity>
-            </View>
-        );
+    return () => {
+      // Reset orientation when leaving
+      ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.PORTRAIT_UP
+      )
     }
+  }, [id])
 
+  async function loadLesson() {
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      setLesson(data)
+    } catch (error) {
+      console.error('Error loading lesson:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handlePlaybackStatusUpdate(status: AVPlaybackStatus) {
+    if (status.isLoaded) {
+      setIsPlaying(status.isPlaying)
+      setPosition(status.positionMillis / 1000)
+      setDuration(status.durationMillis ? status.durationMillis / 1000 : 0)
+
+      // Auto-mark complete when 90% watched
+      if (status.durationMillis && status.positionMillis) {
+        const progress =
+          (status.positionMillis / status.durationMillis) * 100
+        if (progress >= 90) {
+          markLessonComplete()
+        }
+      }
+    }
+  }
+
+  async function markLessonComplete() {
+    // TODO: Implement progress tracking
+    console.log('Lesson complete!')
+  }
+
+  async function toggleFullscreen() {
+    if (isFullscreen) {
+      await ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.PORTRAIT_UP
+      )
+    } else {
+      await ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.LANDSCAPE
+      )
+    }
+    setIsFullscreen(!isFullscreen)
+  }
+
+  function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (loading || !lesson) {
     return (
-        <View style={styles.container}>
-            <Stack.Screen
-                options={{
-                    headerShown: true,
-                    headerTransparent: false,
-                    headerStyle: { backgroundColor: COLORS.background },
-                    headerTintColor: COLORS.text,
-                    headerTitle: '',
-                    headerRight: () => (
-                        <TouchableOpacity
-                            style={[
-                                styles.markCompleteButton,
-                                isCompleted && styles.markCompleteButtonDone,
-                            ]}
-                            onPress={handleToggleComplete}
-                        >
-                            <Ionicons
-                                name={isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                                size={18}
-                                color={isCompleted ? COLORS.success : COLORS.text}
-                            />
-                            <Text
-                                style={[
-                                    styles.markCompleteText,
-                                    isCompleted && styles.markCompleteTextDone,
-                                ]}
-                            >
-                                {isCompleted ? 'Completed' : 'Mark Complete'}
-                            </Text>
-                        </TouchableOpacity>
-                    ),
-                }}
-            />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+      </View>
+    )
+  }
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Video Player */}
-                <VideoPlayer
-                    videoUrl={getVideoUrl(lesson)}
-                    onProgress={handleProgress}
-                    onComplete={handleVideoComplete}
-                />
+  const { width } = Dimensions.get('window')
+  const videoHeight = (width * 9) / 16 // 16:9 aspect ratio
 
-                {/* Lesson Info with Description */}
-                <LessonHeader
-                    title={lesson.title}
-                    description={LESSON_DESCRIPTIONS[lesson.order_index] || "Learn essential boxing techniques with step-by-step instruction from Coach Mustafa. Practice along with the video to build your skills."}
-                    totalDuration={lesson.duration_seconds}
-                    watchedDuration={watchedSeconds}
-                />
+  return (
+    <View style={styles.container}>
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backButtonText}>← Back</Text>
+      </TouchableOpacity>
 
-                {/* Next Up - Course Lessons */}
-                {allLessons.length > 1 && (
-                    <NextUpCourse
-                        lessons={allLessons}
-                        currentLessonId={lesson.id}
-                        courseId={courseId || lesson.course_id}
-                    />
-                )}
+      {/* Video Player */}
+      <View style={[styles.videoContainer, { height: videoHeight }]}>
+        {lesson.video_url ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: lesson.video_url }}
+            style={styles.video}
+            resizeMode={ResizeMode.CONTAIN}
+            useNativeControls
+            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+          />
+        ) : (
+          <View style={styles.placeholderVideo}>
+            <Text style={styles.placeholderEmoji}>🎥</Text>
+            <Text style={styles.placeholderText}>
+              Video coming soon!
+            </Text>
+          </View>
+        )}
+      </View>
 
-                {/* Related Drills */}
-                <RelatedDrills />
+      {/* Lesson Info */}
+      <View style={styles.content}>
+        <Text style={styles.title}>{lesson.title}</Text>
 
-                {/* Related Videos */}
-                {allLessons.length > 1 && (
-                    <RelatedLessons
-                        lessons={allLessons}
-                        currentLessonId={lesson.id}
-                        courseId={courseId || lesson.course_id}
-                    />
-                )}
+        {lesson.description && (
+          <Text style={styles.description}>{lesson.description}</Text>
+        )}
 
-                {/* Spacer for button */}
-                <View style={{ height: 100 }} />
-            </ScrollView>
+        {/* Progress */}
+        {duration > 0 && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${(position / duration) * 100}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {formatTime(position)} / {formatTime(duration)}
+            </Text>
+          </View>
+        )}
 
-            {/* Next Lesson Button */}
-            {nextLesson && (
-                <View style={styles.nextLessonContainer}>
-                    <TouchableOpacity style={styles.nextLessonButton} onPress={handleNextLesson}>
-                        <Text style={styles.nextLessonText}>NEXT LESSON</Text>
-                        <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
-                    </TouchableOpacity>
-                </View>
-            )}
+        {/* Actions */}
+        <View style={styles.actions}>
+          <Button
+            title="Mark as Complete"
+            onPress={markLessonComplete}
+            fullWidth
+            variant="primary"
+          />
+
+          <Button
+            title="Next Lesson"
+            onPress={() => {
+              // TODO: Navigate to next lesson
+              router.back()
+            }}
+            fullWidth
+            variant="outline"
+          />
         </View>
-    );
+      </View>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.background,
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.background,
-        padding: 24,
-    },
-    errorText: {
-        fontSize: 18,
-        color: COLORS.text,
-        marginTop: 16,
-        marginBottom: 24,
-    },
-    backButton: {
-        backgroundColor: COLORS.primary,
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    backButtonText: {
-        color: COLORS.background,
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    markCompleteButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: COLORS.surface,
-    },
-    markCompleteButtonDone: {
-        backgroundColor: 'rgba(76, 175, 80, 0.15)',
-    },
-    markCompleteText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    markCompleteTextDone: {
-        color: COLORS.success,
-    },
-    nextLessonContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 16,
-        paddingBottom: 32,
-        backgroundColor: COLORS.background,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-    },
-    nextLessonButton: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.primary,
-        paddingVertical: 16,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8,
-    },
-    nextLessonText: {
-        color: COLORS.background,
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-});
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  backButton: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+  },
+
+  backButtonText: {
+    fontSize: typography.sizes.base,
+    color: colors.primary[400],
+    fontWeight: '600',
+  },
+
+  videoContainer: {
+    width: '100%',
+    backgroundColor: colors.neutral[950],
+  },
+
+  video: {
+    width: '100%',
+    height: '100%',
+  },
+
+  placeholderVideo: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background.tertiary,
+  },
+
+  placeholderEmoji: {
+    fontSize: 64,
+    marginBottom: spacing[3],
+  },
+
+  placeholderText: {
+    fontSize: typography.sizes.lg,
+    color: colors.text.secondary,
+  },
+
+  content: {
+    flex: 1,
+    padding: spacing[4],
+  },
+
+  title: {
+    fontSize: typography.sizes['3xl'],
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing[3],
+    lineHeight: typography.lineHeights.tight * typography.sizes['3xl'],
+  },
+
+  description: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginBottom: spacing[6],
+    lineHeight: typography.lineHeights.normal * typography.sizes.base,
+  },
+
+  progressContainer: {
+    marginBottom: spacing[6],
+  },
+
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.background.tertiary,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: spacing[2],
+  },
+
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary[500],
+  },
+
+  progressText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+  },
+
+  actions: {
+    gap: spacing[3],
+  },
+})
