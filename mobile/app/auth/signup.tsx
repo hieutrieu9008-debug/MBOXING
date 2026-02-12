@@ -56,20 +56,16 @@ export default function SignupScreen() {
 
     if (error) {
       Alert.alert('Error', error.message)
+      setLoading(false)
+    } else if (data.user) {
+      // Success! Go directly to onboarding
+      router.replace('/onboarding')
     } else {
-      Alert.alert(
-        'Success!',
-        'Account created! Please check your email to verify your account.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/auth/login'),
-          },
-        ]
-      )
+      // Shouldn't happen, but just in case
+      Alert.alert('Success!', 'Account created! Please sign in.')
+      router.replace('/auth/login')
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
