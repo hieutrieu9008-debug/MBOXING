@@ -10,6 +10,7 @@ import {
 import { colors, typography, spacing, layout } from '../../constants/theme'
 import CourseCard from '../../components/CourseCard'
 import { supabase } from '../../lib/supabase'
+import { getCourseProgress } from '../../lib/progress'
 
 interface Course {
   id: string
@@ -20,6 +21,7 @@ interface Course {
   thumbnail_url: string
   is_premium: boolean
   lesson_count?: number
+  progress?: number
 }
 
 export default function BrowseScreen() {
@@ -39,7 +41,15 @@ export default function BrowseScreen() {
 
       if (error) throw error
 
-      setCourses(data || [])
+      // Load progress for each course
+      const coursesWithProgress = await Promise.all(
+        (data || []).map(async (course) => ({
+          ...course,
+          progress: await getCourseProgress(course.id),
+        }))
+      )
+
+      setCourses(coursesWithProgress)
     } catch (error) {
       console.error('Error loading courses:', error)
     } finally {
@@ -84,6 +94,7 @@ export default function BrowseScreen() {
               thumbnail_url={course.thumbnail_url}
               is_premium={course.is_premium}
               lesson_count={course.lesson_count}
+              progress={course.progress}
             />
           ))
         ) : (

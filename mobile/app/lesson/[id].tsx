@@ -14,6 +14,11 @@ import * as ScreenOrientation from 'expo-screen-orientation'
 import { colors, typography, spacing } from '../../constants/theme'
 import { supabase } from '../../lib/supabase'
 import Button from '../../components/Button'
+import {
+  getLessonProgress,
+  updateWatchTime,
+  markLessonComplete,
+} from '../../lib/progress'
 
 interface Lesson {
   id: string
@@ -36,19 +41,34 @@ export default function LessonScreen() {
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isCompleted, setIsCompleted] = useState(false)
+  const [hasMarkedComplete, setHasMarkedComplete] = useState(false)
 
   useEffect(() => {
     if (id) {
       loadLesson()
+      checkProgress()
     }
 
     return () => {
-      // Reset orientation when leaving
+      // Save watch time before leaving
+      if (id && position > 0) {
+        updateWatchTime(id as string, Math.floor(position))
+      }
+      // Reset orientation
       ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.PORTRAIT_UP
       )
     }
   }, [id])
+
+  async function checkProgress() {
+    const progress = await getLessonProgress(id as string)
+    if (progress?.completed) {
+      setIsCompleted(true)
+      setHasMarkedComplete(true)
+    }
+  }
 
   async function loadLesson() {
     try {
@@ -70,23 +90,36 @@ export default function LessonScreen() {
   function handlePlaybackStatusUpdate(status: AVPlaybackStatus) {
     if (status.isLoaded) {
       setIsPlaying(status.isPlaying)
-      setPosition(status.positionMillis / 1000)
+      const currentPosition = status.positionMillis / 1000
+      setPosition(currentPosition)
       setDuration(status.durationMillis ? status.durationMillis / 1000 : 0)
 
+      // Save progress every 10 seconds
+      if (Math.floor(currentPosition) % 10 === 0) {
+        updateWatchTime(id as string, Math.floor(currentPosition))
+      }
+
       // Auto-mark complete when 90% watched
-      if (status.durationMillis && status.positionMillis) {
+      if (
+        status.durationMillis &&
+        status.positionMillis &&
+        !hasMarkedComplete
+      ) {
         const progress =
           (status.positionMillis / status.durationMillis) * 100
         if (progress >= 90) {
-          markLessonComplete()
+          handleMarkComplete()
         }
       }
     }
   }
 
-  async function markLessonComplete() {
-    // TODO: Implement progress tracking
-    console.log('Lesson complete!')
+  async function handleMarkComplete() {
+    if (hasMarkedComplete) return
+    
+    setHasMarkedComplete(true)
+    setIsCompleted(true)
+    await markLessonComplete(id as string)
   }
 
   async function toggleFullscreen() {
@@ -178,10 +211,11 @@ export default function LessonScreen() {
         {/* Actions */}
         <View style={styles.actions}>
           <Button
-            title="Mark as Complete"
-            onPress={markLessonComplete}
+            title={isCompleted ? '✓ Completed' : 'Mark as Complete'}
+            onPress={handleMarkComplete}
             fullWidth
-            variant="primary"
+            variant={isCompleted ? 'secondary' : 'primary'}
+            disabled={isCompleted}
           />
 
           <Button
