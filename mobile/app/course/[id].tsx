@@ -144,7 +144,11 @@ export default function CourseDetailScreen() {
           </View>
 
           <Button
-            title="Start Course"
+            title={
+              lessons.length === 0
+                ? 'No Lessons Yet'
+                : 'Start Course'
+            }
             onPress={() => {
               if (lessons.length > 0) {
                 router.push(`/lesson/${lessons[0].id}`)

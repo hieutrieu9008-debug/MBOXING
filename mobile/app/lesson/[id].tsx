@@ -30,12 +30,18 @@ interface Lesson {
   order_index: number
 }
 
+interface NextLesson {
+  id: string
+  title: string
+}
+
 export default function LessonScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const videoRef = useRef<Video>(null)
 
   const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [nextLesson, setNextLesson] = useState<NextLesson | null>(null)
   const [loading, setLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
@@ -80,6 +86,22 @@ export default function LessonScreen() {
 
       if (error) throw error
       setLesson(data)
+
+      // Find next lesson in course
+      if (data) {
+        const { data: nextLessonData } = await supabase
+          .from('lessons')
+          .select('id, title')
+          .eq('course_id', data.course_id)
+          .gt('order_index', data.order_index)
+          .order('order_index', { ascending: true })
+          .limit(1)
+          .single()
+
+        if (nextLessonData) {
+          setNextLesson(nextLessonData)
+        }
+      }
     } catch (error) {
       console.error('Error loading lesson:', error)
     } finally {
@@ -219,10 +241,13 @@ export default function LessonScreen() {
           />
 
           <Button
-            title="Next Lesson"
+            title={nextLesson ? `Next: ${nextLesson.title}` : 'Back to Course'}
             onPress={() => {
-              // TODO: Navigate to next lesson
-              router.back()
+              if (nextLesson) {
+                router.replace(`/lesson/${nextLesson.id}`)
+              } else {
+                router.back()
+              }
             }}
             fullWidth
             variant="outline"
