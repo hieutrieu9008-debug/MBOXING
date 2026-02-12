@@ -11,10 +11,10 @@ import {
   Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { supabase } from '@/lib/supabase'
-import Button from '@/components/Button'
-import Input from '@/components/Input'
-import { colors, typography, spacing, layout } from '@/constants/theme'
+import { supabase } from '../../lib/supabase'
+import Button from '../../components/Button'
+import Input from '../../components/Input'
+import { colors, typography, spacing, layout } from '../../constants/theme'
 
 export default function SignupScreen() {
   const router = useRouter()
