@@ -192,3 +192,15 @@ export const theme = {
 }
 
 export default theme
+
+// Backwards compatibility exports for old code
+export const COLORS = {
+  background: colors.background.primary,
+  text: colors.text.primary,
+  textMuted: colors.text.secondary,
+  primary: colors.primary[500],
+  card: colors.background.card,
+  border: colors.border.default,
+}
+
+export const SIZES = typography.sizes
