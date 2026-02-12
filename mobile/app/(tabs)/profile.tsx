@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router'
 import { colors, typography, spacing, layout, radius, shadows } from '../../constants/theme'
 import { supabase } from '../../lib/supabase'
 import { getUserStreak } from '../../lib/progress'
+import { getUserSubscription, getSubscriptionBadge } from '../../lib/payments'
 import Button from '../../components/Button'
 
 interface UserStats {
@@ -32,6 +33,7 @@ export default function ProfileScreen() {
     totalMinutes: 0,
   })
   const [streak, setStreak] = useState({ current: 0, longest: 0 })
+  const [subscription, setSubscription] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -70,6 +72,10 @@ export default function ProfileScreen() {
       // Load streak
       const streakData = await getUserStreak()
       setStreak(streakData)
+
+      // Load subscription
+      const subscriptionData = await getUserSubscription()
+      setSubscription(subscriptionData)
     } catch (error) {
       console.error('Error loading profile:', error)
     } finally {
@@ -118,6 +124,21 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Text style={styles.email}>{user?.email}</Text>
+          
+          {/* Subscription Badge */}
+          {subscription && (
+            <View
+              style={[
+                styles.subscriptionBadge,
+                { backgroundColor: getSubscriptionBadge(subscription).color },
+              ]}
+            >
+              <Text style={styles.subscriptionBadgeText}>
+                {getSubscriptionBadge(subscription).label}
+              </Text>
+            </View>
+          )}
+          
           <Text style={styles.memberSince}>
             Member since {new Date(user?.created_at).toLocaleDateString('en-US', { 
               month: 'short', 
@@ -174,13 +195,33 @@ export default function ProfileScreen() {
         <View style={styles.optionsSection}>
           <Text style={styles.sectionTitle}>Settings</Text>
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => router.push('/notifications-settings')}
+          >
             <Text style={styles.optionText}>Notifications</Text>
             <Text style={styles.optionArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
-            <Text style={styles.optionText}>Subscription</Text>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => router.push('/subscription')}
+          >
+            <View style={styles.optionWithBadge}>
+              <Text style={styles.optionText}>Subscription</Text>
+              {subscription && subscription.tier !== 'free' && (
+                <View
+                  style={[
+                    styles.miniSubscriptionBadge,
+                    { backgroundColor: getSubscriptionBadge(subscription).color },
+                  ]}
+                >
+                  <Text style={styles.miniSubscriptionText}>
+                    {getSubscriptionBadge(subscription).label}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.optionArrow}>›</Text>
           </TouchableOpacity>
 
@@ -261,7 +302,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xl,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing[1],
+    marginBottom: spacing[2],
+  },
+
+  subscriptionBadge: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.full,
+    marginBottom: spacing[2],
+  },
+
+  subscriptionBadgeText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.neutral[900],
   },
 
   memberSince: {
@@ -356,10 +410,29 @@ const styles = StyleSheet.create({
     ...shadows.base,
   },
 
+  optionWithBadge: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+
   optionText: {
     fontSize: typography.sizes.base,
     color: colors.text.primary,
     fontWeight: '500',
+  },
+
+  miniSubscriptionBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+
+  miniSubscriptionText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.neutral[900],
   },
 
   optionArrow: {
