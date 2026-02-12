@@ -20,6 +20,11 @@ import {
   Drill,
   DrillLog,
 } from '../../lib/drills'
+import {
+  getDrillPractice,
+  updateDrillPractice,
+  DrillPractice,
+} from '../../lib/spaced-repetition'
 import Button from '../../components/Button'
 
 export default function DrillDetailScreen() {
@@ -29,17 +34,20 @@ export default function DrillDetailScreen() {
   const [drill, setDrill] = useState<Drill | null>(null)
   const [logs, setLogs] = useState<DrillLog[]>([])
   const [totalReps, setTotalReps] = useState(0)
+  const [practice, setPractice] = useState<DrillPractice | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [reps, setReps] = useState('')
   const [notes, setNotes] = useState('')
   const [logging, setLogging] = useState(false)
+  const [showQualityRating, setShowQualityRating] = useState(false)
 
   useEffect(() => {
     if (id) {
       loadDrill()
       loadLogs()
       loadTotalReps()
+      loadPractice()
     }
   }, [id])
 
@@ -62,6 +70,11 @@ export default function DrillDetailScreen() {
     setTotalReps(total)
   }
 
+  async function loadPractice() {
+    const practiceData = await getDrillPractice(id as string)
+    setPractice(practiceData)
+  }
+
   async function handleLogReps() {
     const repsNum = parseInt(reps)
     if (isNaN(repsNum) || repsNum <= 0) {
@@ -73,11 +86,13 @@ export default function DrillDetailScreen() {
     try {
       const result = await logDrillReps(id as string, repsNum, notes.trim() || undefined)
       if (result) {
-        Alert.alert('Success!', `Logged ${repsNum} reps`)
         setNotes('')
         setReps(drill?.default_reps.toString() || '')
         loadLogs()
         loadTotalReps()
+        
+        // Show quality rating for spaced repetition
+        setShowQualityRating(true)
       } else {
         Alert.alert('Error', 'Failed to log reps')
       }
@@ -86,6 +101,18 @@ export default function DrillDetailScreen() {
     } finally {
       setLogging(false)
     }
+  }
+
+  async function handleQualityRating(quality: number) {
+    await updateDrillPractice(id as string, quality)
+    loadPractice()
+    setShowQualityRating(false)
+    
+    Alert.alert(
+      'Great work! 🥊',
+      `Reps logged successfully. Next practice scheduled.`,
+      [{ text: 'OK' }]
+    )
   }
 
   function quickAdd(amount: number) {
@@ -126,6 +153,25 @@ export default function DrillDetailScreen() {
             </Text>
             <Text style={styles.totalRepsLabel}>Total Reps</Text>
           </View>
+
+          {/* Next Practice Date */}
+          {practice && (
+            <View style={styles.nextPracticeCard}>
+              <Text style={styles.nextPracticeLabel}>Next Practice</Text>
+              <Text style={styles.nextPracticeDate}>
+                {new Date(practice.next_practice_date).toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Text>
+              <Text style={styles.practiceInterval}>
+                {practice.interval_days === 1
+                  ? 'Tomorrow'
+                  : `In ${practice.interval_days} days`}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Rep Logger */}
@@ -192,6 +238,42 @@ export default function DrillDetailScreen() {
             disabled={logging || !reps}
           />
         </View>
+
+        {/* Quality Rating (after logging) */}
+        {showQualityRating && (
+          <View style={styles.qualitySection}>
+            <Text style={styles.sectionTitle}>How did it feel?</Text>
+            <Text style={styles.qualityDescription}>
+              Rate the difficulty to optimize your practice schedule
+            </Text>
+
+            <View style={styles.qualityButtons}>
+              <TouchableOpacity
+                style={[styles.qualityButton, styles.qualityButton1]}
+                onPress={() => handleQualityRating(1)}
+              >
+                <Text style={styles.qualityEmoji}>😰</Text>
+                <Text style={styles.qualityLabel}>Hard</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.qualityButton, styles.qualityButton3]}
+                onPress={() => handleQualityRating(3)}
+              >
+                <Text style={styles.qualityEmoji}>😐</Text>
+                <Text style={styles.qualityLabel}>OK</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.qualityButton, styles.qualityButton5]}
+                onPress={() => handleQualityRating(5)}
+              >
+                <Text style={styles.qualityEmoji}>😎</Text>
+                <Text style={styles.qualityLabel}>Easy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Recent Logs */}
         <View style={styles.logsSection}>
@@ -304,6 +386,33 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
 
+  nextPracticeCard: {
+    backgroundColor: colors.background.tertiary,
+    borderRadius: radius.md,
+    padding: spacing[4],
+    marginTop: spacing[4],
+    alignItems: 'center',
+  },
+
+  nextPracticeLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    marginBottom: spacing[1],
+  },
+
+  nextPracticeDate: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing[1],
+  },
+
+  practiceInterval: {
+    fontSize: typography.sizes.sm,
+    color: colors.primary[400],
+    fontWeight: '600',
+  },
+
   loggerSection: {
     paddingHorizontal: spacing[4],
     marginBottom: spacing[8],
@@ -368,6 +477,60 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+
+  qualitySection: {
+    paddingHorizontal: spacing[4],
+    marginBottom: spacing[8],
+    paddingVertical: spacing[6],
+    backgroundColor: colors.background.card,
+    borderRadius: radius.lg,
+    marginHorizontal: spacing[4],
+    ...shadows.base,
+  },
+
+  qualityDescription: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing[6],
+  },
+
+  qualityButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing[3],
+  },
+
+  qualityButton: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing[4],
+    borderRadius: radius.lg,
+    ...shadows.base,
+  },
+
+  qualityButton1: {
+    backgroundColor: colors.accent[400],
+  },
+
+  qualityButton3: {
+    backgroundColor: colors.background.tertiary,
+  },
+
+  qualityButton5: {
+    backgroundColor: colors.primary[500],
+  },
+
+  qualityEmoji: {
+    fontSize: 40,
+    marginBottom: spacing[2],
+  },
+
+  qualityLabel: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.text.primary,
   },
 
   logsSection: {
