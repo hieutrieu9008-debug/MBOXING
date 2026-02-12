@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native'
 import { colors, typography, spacing, layout, radius, shadows } from '../../constants/theme'
 import { supabase } from '../../lib/supabase'
@@ -30,11 +31,18 @@ export default function ActivityScreen() {
     totalMinutes: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadActivity()
     loadStreak()
   }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await Promise.all([loadActivity(), loadStreak()])
+    setRefreshing(false)
+  }
 
   async function loadActivity() {
     try {
@@ -99,6 +107,14 @@ export default function ActivityScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary[500]}
+            colors={[colors.primary[500]]}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>

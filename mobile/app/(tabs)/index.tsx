@@ -12,6 +12,7 @@ import { colors, typography, spacing, layout, radius, shadows } from '../../cons
 import { getDrills, getDrillTotalReps, Drill } from '../../lib/drills'
 import { getDueDrills } from '../../lib/spaced-repetition'
 import DrillCard from '../../components/DrillCard'
+import SearchBar from '../../components/SearchBar'
 
 const CATEGORIES = ['All', 'Jab', 'Cross', 'Hook', 'Uppercut', 'Footwork', 'Defense']
 
@@ -19,6 +20,7 @@ export default function DrillsScreen() {
   const [drills, setDrills] = useState<Drill[]>([])
   const [dueDrills, setDueDrills] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [drillReps, setDrillReps] = useState<Record<string, number>>({})
 
@@ -52,10 +54,21 @@ export default function DrillsScreen() {
     }
   }
 
-  const filteredDrills =
-    selectedCategory === 'All'
-      ? drills
-      : drills.filter((drill) => drill.category === selectedCategory)
+  // Filter by category
+  let filteredDrills = selectedCategory === 'All'
+    ? drills
+    : drills.filter((drill) => drill.category === selectedCategory)
+
+  // Filter by search query
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase()
+    filteredDrills = filteredDrills.filter(
+      (drill) =>
+        drill.name.toLowerCase().includes(query) ||
+        drill.description.toLowerCase().includes(query) ||
+        drill.category.toLowerCase().includes(query)
+    )
+  }
 
   if (loading) {
     return (
@@ -90,6 +103,16 @@ export default function DrillsScreen() {
           </View>
         </View>
       )}
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search drills..."
+          onClear={() => setSearchQuery('')}
+        />
+      </View>
 
       {/* Category Filter */}
       <ScrollView
@@ -221,6 +244,11 @@ const styles = StyleSheet.create({
   dueBannerSubtitle: {
     fontSize: typography.sizes.sm,
     color: colors.neutral[800],
+  },
+
+  searchContainer: {
+    paddingHorizontal: layout.screenPadding,
+    marginBottom: spacing[4],
   },
 
   categoryScroll: {

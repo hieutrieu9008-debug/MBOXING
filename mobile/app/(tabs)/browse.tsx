@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native'
 import { colors, typography, spacing, layout } from '../../constants/theme'
 import CourseCard from '../../components/CourseCard'
@@ -27,10 +28,17 @@ interface Course {
 export default function BrowseScreen() {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadCourses()
   }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await loadCourses()
+    setRefreshing(false)
+  }
 
   async function loadCourses() {
     try {
@@ -80,6 +88,14 @@ export default function BrowseScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary[500]}
+            colors={[colors.primary[500]]}
+          />
+        }
       >
         {/* Courses */}
         {courses.length > 0 ? (

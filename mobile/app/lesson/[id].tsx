@@ -19,6 +19,8 @@ import {
   updateWatchTime,
   markLessonComplete,
 } from '../../lib/progress'
+import { hasPremiumAccess } from '../../lib/payments'
+import PremiumLock from '../../components/PremiumLock'
 
 interface Lesson {
   id: string
@@ -43,6 +45,7 @@ export default function LessonScreen() {
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [nextLesson, setNextLesson] = useState<NextLesson | null>(null)
   const [loading, setLoading] = useState(true)
+  const [hasPremium, setHasPremium] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -54,6 +57,7 @@ export default function LessonScreen() {
     if (id) {
       loadLesson()
       checkProgress()
+      checkPremiumAccess()
     }
 
     return () => {
@@ -67,6 +71,11 @@ export default function LessonScreen() {
       )
     }
   }, [id])
+
+  async function checkPremiumAccess() {
+    const premium = await hasPremiumAccess()
+    setHasPremium(premium)
+  }
 
   async function checkProgress() {
     const progress = await getLessonProgress(id as string)
@@ -167,6 +176,23 @@ export default function LessonScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary[500]} />
+      </View>
+    )
+  }
+
+  // Check if lesson is premium and user doesn't have access
+  const needsPremium = lesson.is_premium && !hasPremium
+
+  if (needsPremium) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <PremiumLock
+          title={lesson.title}
+          description="This is a premium lesson. Upgrade to access all premium content and advanced features."
+        />
       </View>
     )
   }
