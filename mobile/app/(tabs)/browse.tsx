@@ -1,188 +1,173 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
-import { getCourses, getCoursesByCategory, searchCourses, Course } from '../../lib/database';
-import SearchBar from '../../components/SearchBar';
-import CategoryChip from '../../components/CategoryChip';
-import CourseCard from '../../components/CourseCard';
+import { useState, useEffect } from 'react'
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  SafeAreaView,
+} from 'react-native'
+import { colors, typography, spacing, layout } from '../../constants/theme'
+import CourseCard from '../../components/CourseCard'
+import { supabase } from '../../lib/supabase'
 
-const CATEGORIES = ['All', 'Boxing', 'Footwork', 'Defense'];
+interface Course {
+  id: string
+  title: string
+  description: string
+  category: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  thumbnail_url: string
+  is_premium: boolean
+  lesson_count?: number
+}
 
 export default function BrowseScreen() {
-    const [courses, setCourses] = useState<Course[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState('All');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
 
-    const loadCourses = useCallback(async () => {
-        try {
-            let data: Course[];
+  useEffect(() => {
+    loadCourses()
+  }, [])
 
-            if (searchQuery.trim()) {
-                data = await searchCourses(searchQuery);
-            } else if (selectedCategory !== 'All') {
-                data = await getCoursesByCategory(selectedCategory);
-            } else {
-                data = await getCourses();
-            }
+  async function loadCourses() {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('order_index', { ascending: true })
 
-            setCourses(data);
-        } catch (error) {
-            console.error('Error loading courses:', error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [selectedCategory, searchQuery]);
+      if (error) throw error
 
-    useEffect(() => {
-        loadCourses();
-    }, [loadCourses]);
-
-    const handleRefresh = () => {
-        setRefreshing(true);
-        loadCourses();
-    };
-
-    const handleCategoryPress = (category: string) => {
-        setSelectedCategory(category);
-        setSearchQuery('');
-    };
-
-    const featuredCourse = courses[0];
-    const otherCourses = courses.slice(1);
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Loading courses...</Text>
-            </View>
-        );
+      setCourses(data || [])
+    } catch (error) {
+      console.error('Error loading courses:', error)
+    } finally {
+      setLoading(false)
     }
+  }
 
+  if (loading) {
     return (
-        <View style={styles.container}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        tintColor={COLORS.primary}
-                    />
-                }
-            >
-                {/* Search Bar */}
-                <SearchBar
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search courses..."
-                />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <Text style={styles.loadingText}>Loading courses...</Text>
+      </View>
+    )
+  }
 
-                {/* Category Filters */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.categoryContainer}
-                    contentContainerStyle={styles.categoryContent}
-                >
-                    {CATEGORIES.map((category) => (
-                        <CategoryChip
-                            key={category}
-                            label={category}
-                            isSelected={selectedCategory === category}
-                            onPress={() => handleCategoryPress(category)}
-                        />
-                    ))}
-                </ScrollView>
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Browse Courses</Text>
+        <Text style={styles.headerSubtitle}>
+          Master the sweet science with Coach Mustafa
+        </Text>
+      </View>
 
-                {/* Featured Course */}
-                {featuredCourse && (
-                    <>
-                        <Text style={styles.sectionTitle}>Featured Course</Text>
-                        <CourseCard course={featuredCourse} featured />
-                    </>
-                )}
-
-                {/* All Courses */}
-                <Text style={styles.sectionTitle}>
-                    {selectedCategory === 'All' ? 'All Courses' : `${selectedCategory} Courses`}
-                </Text>
-
-                <View style={styles.courseList}>
-                    {otherCourses.length > 0 ? (
-                        otherCourses.map((course) => (
-                            <CourseCard key={course.id} course={course} />
-                        ))
-                    ) : courses.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyEmoji}>🔍</Text>
-                            <Text style={styles.emptyTitle}>No courses found</Text>
-                            <Text style={styles.emptySubtitle}>
-                                {searchQuery
-                                    ? 'Try a different search term'
-                                    : 'Check back later for new content'}
-                            </Text>
-                        </View>
-                    ) : null}
-                </View>
-            </ScrollView>
-        </View>
-    );
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Courses */}
+        {courses.length > 0 ? (
+          courses.map((course) => (
+            <CourseCard
+              key={course.id}
+              id={course.id}
+              title={course.title}
+              description={course.description}
+              category={course.category}
+              difficulty={course.difficulty}
+              thumbnail_url={course.thumbnail_url}
+              is_premium={course.is_premium}
+              lesson_count={course.lesson_count}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>🥊</Text>
+            <Text style={styles.emptyTitle}>No courses yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Coach Mustafa is preparing amazing content for you!
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  )
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    loadingContainer: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingText: {
-        marginTop: SIZES.md,
-        fontSize: SIZES.fontMd,
-        color: COLORS.textMuted,
-    },
-    categoryContainer: {
-        marginBottom: SIZES.lg,
-    },
-    categoryContent: {
-        paddingHorizontal: SIZES.lg,
-    },
-    sectionTitle: {
-        fontSize: SIZES.fontLg,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginHorizontal: SIZES.lg,
-        marginBottom: SIZES.md,
-    },
-    courseList: {
-        paddingHorizontal: SIZES.lg,
-        paddingBottom: SIZES.xxl,
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: SIZES.xxl,
-    },
-    emptyEmoji: {
-        fontSize: 48,
-        marginBottom: SIZES.md,
-    },
-    emptyTitle: {
-        fontSize: SIZES.fontLg,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: SIZES.xs,
-    },
-    emptySubtitle: {
-        fontSize: SIZES.fontMd,
-        color: COLORS.textMuted,
-    },
-});
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingText: {
+    marginTop: spacing[4],
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+  },
+
+  header: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing[4],
+    paddingBottom: spacing[6],
+  },
+
+  headerTitle: {
+    fontSize: typography.sizes['4xl'],
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing[2],
+  },
+
+  headerSubtitle: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingHorizontal: layout.screenPadding,
+    paddingBottom: spacing[8],
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[20],
+  },
+
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: spacing[4],
+  },
+
+  emptyTitle: {
+    fontSize: typography.sizes['2xl'],
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing[2],
+  },
+
+  emptySubtitle: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing[8],
+  },
+})
