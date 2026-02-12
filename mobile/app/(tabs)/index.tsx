@@ -8,21 +8,29 @@ import {
   SafeAreaView,
   TouchableOpacity,
 } from 'react-native'
-import { colors, typography, spacing, layout } from '../../constants/theme'
+import { colors, typography, spacing, layout, radius, shadows } from '../../constants/theme'
 import { getDrills, getDrillTotalReps, Drill } from '../../lib/drills'
+import { getDueDrills } from '../../lib/spaced-repetition'
 import DrillCard from '../../components/DrillCard'
 
 const CATEGORIES = ['All', 'Jab', 'Cross', 'Hook', 'Uppercut', 'Footwork', 'Defense']
 
 export default function DrillsScreen() {
   const [drills, setDrills] = useState<Drill[]>([])
+  const [dueDrills, setDueDrills] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [loading, setLoading] = useState(true)
   const [drillReps, setDrillReps] = useState<Record<string, number>>({})
 
   useEffect(() => {
     loadDrills()
+    loadDueDrills()
   }, [])
+
+  async function loadDueDrills() {
+    const due = await getDueDrills()
+    setDueDrills(due)
+  }
 
   async function loadDrills() {
     try {
@@ -67,6 +75,21 @@ export default function DrillsScreen() {
           Practice and track your technique
         </Text>
       </View>
+
+      {/* Practice Today Banner */}
+      {dueDrills.length > 0 && (
+        <View style={styles.dueBanner}>
+          <View style={styles.dueBannerContent}>
+            <Text style={styles.dueBannerEmoji}>🔔</Text>
+            <View style={styles.dueBannerText}>
+              <Text style={styles.dueBannerTitle}>Practice Due Today</Text>
+              <Text style={styles.dueBannerSubtitle}>
+                {dueDrills.length} {dueDrills.length === 1 ? 'drill' : 'drills'} ready for review
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Category Filter */}
       <ScrollView
@@ -163,6 +186,41 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
+  },
+
+  dueBanner: {
+    marginHorizontal: layout.screenPadding,
+    marginBottom: spacing[4],
+    backgroundColor: colors.primary[500],
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    ...shadows.base,
+  },
+
+  dueBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  dueBannerEmoji: {
+    fontSize: 32,
+    marginRight: spacing[3],
+  },
+
+  dueBannerText: {
+    flex: 1,
+  },
+
+  dueBannerTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: '700',
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
+  },
+
+  dueBannerSubtitle: {
+    fontSize: typography.sizes.sm,
+    color: colors.neutral[800],
   },
 
   categoryScroll: {
